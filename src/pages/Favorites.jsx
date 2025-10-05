@@ -1,8 +1,8 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { FiHeart, FiShoppingCart, FiFilter, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
-import './Products.css'
+import { FiHeart, FiShoppingCart, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
+import './Favorites.css'
 
 const productsData = [
   {
@@ -175,30 +175,10 @@ const productsData = [
   }
 ]
 
-const categories = [
-  { id: 'all', name: 'All Items', icon: '🧶' },
-  { id: 'scarves', name: 'Scarves', icon: '🧣' },
-  { id: 'sweaters', name: 'Sweaters', icon: '👚' },
-  { id: 'hats', name: 'Hats', icon: '🎩' },
-  { id: 'gloves', name: 'Gloves', icon: '🧤' },
-  { id: 'blankets', name: 'Blankets', icon: '🛏️' },
-  { id: 'socks', name: 'Socks', icon: '🧦' },
-  { id: 'baby', name: 'Baby', icon: '👶' },
-  { id: 'accessories', name: 'Accessories', icon: '☕' }
-]
-
-const sortOptions = [
-  { id: 'featured', name: 'Featured' },
-  { id: 'price-low', name: 'Price: Low to High' },
-  { id: 'price-high', name: 'Price: High to Low' },
-  { id: 'name', name: 'Name: A-Z' }
-]
-
-const ProductCard = ({ product, addToCart, isFavorite, toggleFavorite, cartItem }) => {
+const FavoriteCard = ({ product, addToCart, toggleFavorite, cartItem }) => {
   const navigate = useNavigate()
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
 
-  // Sync with cart state
   const isInCart = cartItem !== undefined
   const quantity = cartItem?.quantity || 1
 
@@ -226,7 +206,6 @@ const ProductCard = ({ product, addToCart, isFavorite, toggleFavorite, cartItem 
     if (newQuantity > 0) {
       addToCart({ ...product, quantity: newQuantity })
     }
-    // If quantity becomes 0, the cart will handle removal
   }
 
   const handleAddToCart = (e) => {
@@ -238,9 +217,14 @@ const ProductCard = ({ product, addToCart, isFavorite, toggleFavorite, cartItem 
     navigate(`/product/${product.id}`)
   }
 
+  const handleRemoveFavorite = (e) => {
+    e.stopPropagation()
+    toggleFavorite(product.id)
+  }
+
   return (
     <motion.div
-      className="product-card"
+      className="favorite-card"
       layout
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -250,13 +234,10 @@ const ProductCard = ({ product, addToCart, isFavorite, toggleFavorite, cartItem 
       onClick={handleCardClick}
       style={{ cursor: 'pointer' }}
     >
-      {/* Favorite button */}
+      {/* Remove from Favorites button */}
       <motion.button
-        className={`favorite-btn ${isFavorite ? 'active' : ''}`}
-        onClick={(e) => {
-          e.stopPropagation()
-          toggleFavorite(product.id)
-        }}
+        className="remove-favorite-btn active"
+        onClick={handleRemoveFavorite}
         whileHover={{ scale: 1.2 }}
         whileTap={{ scale: 0.9 }}
       >
@@ -264,11 +245,11 @@ const ProductCard = ({ product, addToCart, isFavorite, toggleFavorite, cartItem 
       </motion.button>
 
       {/* Image Carousel */}
-      <div className="product-image-carousel">
+      <div className="favorite-image-carousel">
         <img
           src={product.images[currentImageIndex]}
           alt={product.name}
-          className="product-image"
+          className="favorite-image"
         />
 
         {/* Carousel Controls */}
@@ -299,12 +280,12 @@ const ProductCard = ({ product, addToCart, isFavorite, toggleFavorite, cartItem 
       </div>
 
       {/* Product Info */}
-      <div className="product-info">
-        <h3 className="product-name">{product.name}</h3>
-        <p className="product-description">{product.description}</p>
+      <div className="favorite-info">
+        <h3 className="favorite-name">{product.name}</h3>
+        <p className="favorite-description">{product.description}</p>
 
         {/* Color palette */}
-        <div className="product-colors">
+        <div className="favorite-colors">
           {product.colors.map((color, i) => (
             <motion.span
               key={i}
@@ -315,53 +296,43 @@ const ProductCard = ({ product, addToCart, isFavorite, toggleFavorite, cartItem 
           ))}
         </div>
 
-        <div className="product-meta">
+        <div className="favorite-meta">
           <span className="difficulty-badge">{product.difficulty}</span>
         </div>
 
-        <div className="product-footer">
-          <span className="product-price">${product.price}</span>
+        <div className="favorite-footer">
+          <span className="favorite-price">${product.price}</span>
 
           {/* Show Add to Cart button OR Quantity Controls */}
           {!isInCart ? (
             <motion.button
-              className="add-to-cart-btn"
+              className="add-to-cart-btn-fav"
               onClick={handleAddToCart}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
             >
               <FiShoppingCart /> Add to Cart
             </motion.button>
           ) : (
-            <motion.div
-              className="quantity-selector"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <span className="quantity-label">Quantity:</span>
-              <div className="quantity-controls">
-                <motion.button
-                  className="quantity-btn"
-                  onClick={decrementQuantity}
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                >
-                  -
-                </motion.button>
-                <span className="quantity-value">{quantity}</span>
-                <motion.button
-                  className="quantity-btn"
-                  onClick={incrementQuantity}
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                >
-                  +
-                </motion.button>
-              </div>
-            </motion.div>
+            <div className="quantity-selector-fav" onClick={(e) => e.stopPropagation()}>
+              <motion.button
+                className="quantity-btn"
+                onClick={decrementQuantity}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+              >
+                -
+              </motion.button>
+              <span className="quantity-value">{quantity}</span>
+              <motion.button
+                className="quantity-btn"
+                onClick={incrementQuantity}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+              >
+                +
+              </motion.button>
+            </div>
           )}
         </div>
       </div>
@@ -369,237 +340,101 @@ const ProductCard = ({ product, addToCart, isFavorite, toggleFavorite, cartItem 
   )
 }
 
-const Products = ({ addToCart, cart = [], favorites = [], toggleFavorite }) => {
-  const [selectedCategory, setSelectedCategory] = useState('all')
-  const [sortBy, setSortBy] = useState('featured')
-  const [showFilters, setShowFilters] = useState(false)
+const Favorites = ({ favorites, toggleFavorite, addToCart, cart }) => {
+  const navigate = useNavigate()
+
+  const favoriteProducts = productsData.filter(product =>
+    favorites.includes(product.id)
+  )
 
   const getCartItem = (productId) => {
     return cart.find(item => item.id === productId)
   }
 
-  const filteredAndSortedProducts = useMemo(() => {
-    let filtered = selectedCategory === 'all'
-      ? productsData
-      : productsData.filter(p => p.category === selectedCategory)
-
-    let sorted = [...filtered]
-    switch (sortBy) {
-      case 'price-low':
-        sorted.sort((a, b) => a.price - b.price)
-        break
-      case 'price-high':
-        sorted.sort((a, b) => b.price - a.price)
-        break
-      case 'name':
-        sorted.sort((a, b) => a.name.localeCompare(b.name))
-        break
-      default:
-        break
-    }
-
-    return sorted
-  }, [selectedCategory, sortBy])
-
   return (
-    <div className="products-page">
+    <div className="favorites-page">
       {/* Hero Section */}
       <motion.section
-        className="products-hero"
+        className="favorites-hero"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.8 }}
       >
-        <div className="products-hero-content">
+        <div className="favorites-hero-content">
           <motion.div
             initial={{ y: 30, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.2, duration: 0.6 }}
           >
-            <h1 className="products-title">
-              <span className="yarn-emoji">🧶</span>
-              Nani's Collection
-              <span className="yarn-emoji">🧶</span>
+            <h1 className="favorites-title">
+              <FiHeart className="heart-icon" />
+              My Favorites
             </h1>
-            <p className="products-subtitle">
-              Every stitch tells a story, every piece is made with love
+            <p className="favorites-subtitle">
+              Your handpicked collection of cozy treasures
             </p>
-          </motion.div>
-
-          {/* Floating knitting needles decoration */}
-          <motion.div
-            className="floating-needle needle-1"
-            animate={{
-              y: [-10, 10, -10],
-              rotate: [0, 5, 0]
-            }}
-            transition={{
-              duration: 4,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-          >
-            🪡
-          </motion.div>
-          <motion.div
-            className="floating-needle needle-2"
-            animate={{
-              y: [10, -10, 10],
-              rotate: [0, -5, 0]
-            }}
-            transition={{
-              duration: 5,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-          >
-            🪡
           </motion.div>
         </div>
       </motion.section>
 
-      <div className="products-container">
-        {/* Filters Section */}
-        <motion.div
-          className="filters-section"
-          initial={{ x: -50, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          transition={{ delay: 0.3, duration: 0.6 }}
-        >
-          <div className="filters-header">
-            <h2>
-              <FiFilter /> Filters
-            </h2>
-            <button
-              className="mobile-filter-toggle"
-              onClick={() => setShowFilters(!showFilters)}
-            >
-              {showFilters ? 'Hide' : 'Show'} Filters
-            </button>
-          </div>
-
-          <div className={`filters-content ${showFilters ? 'show' : ''}`}>
-            {/* Categories */}
-            <div className="filter-group">
-              <h3>Categories</h3>
-              <div className="category-filters">
-                {categories.map((cat) => (
-                  <motion.button
-                    key={cat.id}
-                    className={`category-btn ${selectedCategory === cat.id ? 'active' : ''}`}
-                    onClick={() => setSelectedCategory(cat.id)}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <span className="cat-icon">{cat.icon}</span>
-                    {cat.name}
-                  </motion.button>
-                ))}
-              </div>
-            </div>
-
-            {/* Sort */}
-            <div className="filter-group">
-              <h3>Sort By</h3>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="sort-select"
-              >
-                {sortOptions.map(opt => (
-                  <option key={opt.id} value={opt.id}>{opt.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Decorative element */}
+      <div className="favorites-container">
+        {favoriteProducts.length === 0 ? (
+          <motion.div
+            className="empty-favorites"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
             <motion.div
-              className="filter-decoration"
+              className="empty-heart-icon"
               animate={{
-                rotate: [0, 360],
-                scale: [1, 1.1, 1]
+                scale: [1, 1.1, 1],
               }}
               transition={{
-                duration: 20,
+                duration: 2,
                 repeat: Infinity,
-                ease: "linear"
+                ease: "easeInOut"
               }}
             >
-              🧵
+              💝
             </motion.div>
-          </div>
-        </motion.div>
-
-        {/* Products Grid */}
-        <div className="products-main">
-          <motion.div
-            className="products-grid"
-            layout
-          >
-            <AnimatePresence mode="popLayout">
-              {filteredAndSortedProducts.map((product) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  addToCart={addToCart}
-                  isFavorite={favorites.includes(product.id)}
-                  toggleFavorite={toggleFavorite}
-                  cartItem={getCartItem(product.id)}
-                />
-              ))}
-            </AnimatePresence>
-          </motion.div>
-
-          {/* No results */}
-          {filteredAndSortedProducts.length === 0 && (
-            <motion.div
-              className="no-results"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+            <h2>No favorites yet</h2>
+            <p>Start adding items you love to your wishlist!</p>
+            <motion.button
+              className="browse-products-btn"
+              onClick={() => navigate('/products')}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
             >
-              <span className="no-results-emoji">🧶</span>
-              <p>No products found in this category</p>
-              <button onClick={() => setSelectedCategory('all')}>
-                View All Products
-              </button>
-            </motion.div>
-          )}
-        </div>
-      </div>
+              Browse Products
+            </motion.button>
+          </motion.div>
+        ) : (
+          <>
+            <div className="favorites-count">
+              <span>{favoriteProducts.length} item{favoriteProducts.length !== 1 ? 's' : ''} in your wishlist</span>
+            </div>
 
-      {/* Floating yarn balls decoration */}
-      <motion.div
-        className="floating-yarn yarn-1"
-        animate={{
-          x: [-20, 20, -20],
-          y: [-20, 20, -20],
-          rotate: [0, 360]
-        }}
-        transition={{
-          duration: 15,
-          repeat: Infinity,
-          ease: "easeInOut"
-        }}
-      >
-        🧶
-      </motion.div>
-      <motion.div
-        className="floating-yarn yarn-2"
-        animate={{
-          x: [20, -20, 20],
-          y: [20, -20, 20],
-          rotate: [360, 0]
-        }}
-        transition={{
-          duration: 18,
-          repeat: Infinity,
-          ease: "easeInOut"
-        }}
-      >
-        🧶
-      </motion.div>
+            <motion.div
+              className="favorites-grid"
+              layout
+            >
+              <AnimatePresence mode="popLayout">
+                {favoriteProducts.map((product) => (
+                  <FavoriteCard
+                    key={product.id}
+                    product={product}
+                    addToCart={addToCart}
+                    toggleFavorite={toggleFavorite}
+                    cartItem={getCartItem(product.id)}
+                  />
+                ))}
+              </AnimatePresence>
+            </motion.div>
+          </>
+        )}
+      </div>
     </div>
   )
 }
 
-export default Products
+export default Favorites

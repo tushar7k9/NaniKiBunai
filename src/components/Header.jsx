@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { FiShoppingCart, FiMenu, FiX, FiSearch, FiHeart } from 'react-icons/fi'
 import './Header.css'
 
-const Header = ({ cartCount, onCartClick }) => {
+const Header = ({ cartCount, favoritesCount, onCartClick, onFavoritesClick }) => {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
@@ -51,11 +51,22 @@ const Header = ({ cartCount, onCartClick }) => {
           </motion.button>
 
           <motion.button
-            className="icon-btn"
+            className="icon-btn favorites-btn"
+            onClick={() => window.location.href = '/favorites'}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
           >
             <FiHeart />
+            {favoritesCount > 0 && (
+              <motion.span
+                className="favorites-count"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", stiffness: 500 }}
+              >
+                {favoritesCount}
+              </motion.span>
+            )}
           </motion.button>
 
           <motion.button

@@ -164,16 +164,30 @@ const reviews = {
   ]
 }
 
-const ProductDetail = ({ addToCart }) => {
+const ProductDetail = ({ addToCart, cart = [], favorites = [], toggleFavorite }) => {
   const { id } = useParams()
   const navigate = useNavigate()
   const product = productsData.find(p => p.id === parseInt(id))
   const productReviews = reviews[parseInt(id)] || []
 
+  // Find this product in cart
+  const cartItem = cart.find(item => item.id === parseInt(id))
+
+  // Check if this product is in favorites
+  const isFavorite = favorites.includes(parseInt(id))
+
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
-  const [quantity, setQuantity] = useState(1)
-  const [isFavorite, setIsFavorite] = useState(false)
+  const [quantity, setQuantity] = useState(cartItem?.quantity || 1)
   const [selectedColor, setSelectedColor] = useState(0)
+
+  // Sync quantity with cart when cart changes
+  React.useEffect(() => {
+    if (cartItem) {
+      setQuantity(cartItem.quantity)
+    } else {
+      setQuantity(1)
+    }
+  }, [cartItem])
 
   if (!product) {
     return (
@@ -195,14 +209,23 @@ const ProductDetail = ({ addToCart }) => {
   }
 
   const incrementQuantity = () => {
-    setQuantity(prev => prev + 1)
+    const newQuantity = quantity + 1
+    setQuantity(newQuantity)
+    // Immediately update cart
+    addToCart({ ...product, quantity: newQuantity, selectedColor: product.colors[selectedColor] })
   }
 
   const decrementQuantity = () => {
-    setQuantity(prev => prev > 1 ? prev - 1 : 1)
+    if (quantity > 1) {
+      const newQuantity = quantity - 1
+      setQuantity(newQuantity)
+      // Immediately update cart
+      addToCart({ ...product, quantity: newQuantity, selectedColor: product.colors[selectedColor] })
+    }
   }
 
   const handleAddToCart = () => {
+    // Add to cart with current quantity
     addToCart({ ...product, quantity, selectedColor: product.colors[selectedColor] })
   }
 
@@ -259,7 +282,7 @@ const ProductDetail = ({ addToCart }) => {
             {/* Favorite Button */}
             <motion.button
               className={`favorite-btn-detail ${isFavorite ? 'active' : ''}`}
-              onClick={() => setIsFavorite(!isFavorite)}
+              onClick={() => toggleFavorite(parseInt(id))}
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
             >
