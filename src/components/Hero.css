@@ -1,0 +1,283 @@
+.hero {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 120px 20px 80px;
+  background: linear-gradient(135deg, var(--cream) 0%, var(--warm-white) 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Decorative background pattern */
+.hero::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(196, 137, 106, 0.08) 0%, transparent 70%);
+  border-radius: 50%;
+}
+
+.hero-content {
+  max-width: var(--container-max-width);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 80px;
+  align-items: center;
+  position: relative;
+  z-index: 2;
+}
+
+.hero-text h1 {
+  font-size: 4rem;
+  margin-bottom: 20px;
+  color: var(--deep-brown);
+  line-height: 1.2;
+}
+
+.hero-subtitle {
+  font-size: 1.5rem;
+  color: var(--terracotta);
+  font-family: var(--font-heading);
+  font-style: italic;
+  margin-bottom: 25px;
+}
+
+.hero-description {
+  font-size: 1.1rem;
+  color: var(--text-light);
+  margin-bottom: 35px;
+  line-height: 1.8;
+  max-width: 500px;
+}
+
+.hero-buttons {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.hero-image {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hero-image-placeholder {
+  width: 500px;
+  height: 500px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 70% 70%, rgba(0, 0, 0, 0.15) 0%, transparent 50%),
+    linear-gradient(135deg, #C4896A 0%, #A67B5B 50%, #8B6F4E 100%);
+  position: relative;
+  overflow: visible;
+  box-shadow:
+    var(--shadow-lg),
+    inset -20px -20px 40px rgba(0, 0, 0, 0.2),
+    inset 20px 20px 40px rgba(255, 255, 255, 0.1);
+}
+
+.knit-pattern {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+/* Wool yarn strand effect */
+.knit-pattern::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    /* Curved yarn strands */
+    repeating-linear-gradient(
+      45deg,
+      transparent 0px,
+      transparent 8px,
+      rgba(255, 255, 255, 0.15) 8px,
+      rgba(255, 255, 255, 0.15) 12px,
+      transparent 12px,
+      transparent 20px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      transparent 0px,
+      transparent 8px,
+      rgba(255, 255, 255, 0.1) 8px,
+      rgba(255, 255, 255, 0.1) 12px,
+      transparent 12px,
+      transparent 20px
+    );
+  border-radius: 50%;
+  animation: rotateYarn 30s linear infinite;
+}
+
+/* Knit texture overlay */
+.knit-pattern::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.2) 2px, transparent 2px),
+    radial-gradient(circle at 40% 50%, rgba(255, 255, 255, 0.15) 2px, transparent 2px),
+    radial-gradient(circle at 60% 30%, rgba(255, 255, 255, 0.2) 2px, transparent 2px),
+    radial-gradient(circle at 80% 50%, rgba(255, 255, 255, 0.15) 2px, transparent 2px),
+    radial-gradient(circle at 30% 70%, rgba(255, 255, 255, 0.2) 2px, transparent 2px),
+    radial-gradient(circle at 70% 70%, rgba(255, 255, 255, 0.15) 2px, transparent 2px);
+  background-size: 40px 40px;
+  background-position: 0 0, 20px 10px, 10px 30px, 30px 20px, 15px 35px, 35px 15px;
+  border-radius: 50%;
+  animation: moveTexture 40s linear infinite;
+}
+
+/* Floating yarn thread */
+.hero-image-placeholder::before {
+  content: '';
+  position: absolute;
+  width: 120%;
+  height: 120%;
+  top: -10%;
+  left: -10%;
+  background:
+    linear-gradient(90deg, transparent 48%, rgba(255, 255, 255, 0.4) 49%, rgba(255, 255, 255, 0.6) 50%, rgba(255, 255, 255, 0.4) 51%, transparent 52%);
+  transform: rotate(-25deg);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: shimmerYarn 3s ease-in-out infinite;
+}
+
+/* Wool ball shadow depth */
+.hero-image-placeholder::after {
+  content: '';
+  position: absolute;
+  width: 70%;
+  height: 70%;
+  top: 15%;
+  left: 15%;
+  background: radial-gradient(circle, transparent 40%, rgba(0, 0, 0, 0.1) 70%, rgba(0, 0, 0, 0.2) 100%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+@keyframes rotateYarn {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes moveTexture {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  100% {
+    transform: translate(20px, 20px) rotate(360deg);
+  }
+}
+
+@keyframes shimmerYarn {
+  0%, 100% {
+    opacity: 0.3;
+    transform: rotate(-25deg) translateX(-10px);
+  }
+  50% {
+    opacity: 0.7;
+    transform: rotate(-25deg) translateX(10px);
+  }
+}
+
+.scroll-indicator {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-light);
+  font-size: 0.9rem;
+}
+
+.scroll-line {
+  width: 2px;
+  height: 40px;
+  background: linear-gradient(to bottom, var(--terracotta), transparent);
+  animation: scrollAnimation 2s infinite;
+}
+
+@keyframes scrollAnimation {
+  0%, 100% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(10px);
+  }
+}
+
+/* Mobile Responsive */
+@media (max-width: 1024px) {
+  .hero-content {
+    gap: 50px;
+  }
+
+  .hero-text h1 {
+    font-size: 3rem;
+  }
+
+  .hero-image-placeholder {
+    width: 400px;
+    height: 400px;
+  }
+}
+
+@media (max-width: 768px) {
+  .hero {
+    min-height: auto;
+    padding: 100px 20px 60px;
+  }
+
+  .hero-content {
+    grid-template-columns: 1fr;
+    gap: 50px;
+    text-align: center;
+  }
+
+  .hero-text h1 {
+    font-size: 2.5rem;
+  }
+
+  .hero-subtitle {
+    font-size: 1.3rem;
+  }
+
+  .hero-description {
+    font-size: 1rem;
+    margin: 0 auto 30px;
+  }
+
+  .hero-buttons {
+    justify-content: center;
+  }
+
+  .hero-image-placeholder {
+    width: 300px;
+    height: 300px;
+  }
+
+  .scroll-indicator {
+    display: none;
+  }
+}
