@@ -1,10 +1,14 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FiHeart, FiShoppingCart, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
+import { useProducts } from '../hooks/useProducts'
+import { useCart } from '../hooks/useCart'
+import { useFavorites } from '../hooks/useFavorites'
 import './Favorites.css'
 
-const productsData = [
+// Static product data for fallback
+const STATIC_PRODUCTS_FAVORITES = [
   {
     id: 1,
     name: 'Cozy Winter Scarf',
@@ -340,15 +344,36 @@ const FavoriteCard = ({ product, addToCart, toggleFavorite, cartItem }) => {
   )
 }
 
-const Favorites = ({ favorites, toggleFavorite, addToCart, cart }) => {
+const Favorites = () => {
   const navigate = useNavigate()
 
-  const favoriteProducts = productsData.filter(product =>
-    favorites.includes(product.id)
-  )
+  // Use context hooks
+  const { products, loading: productsLoading } = useProducts()
+  const { addToCart, getCartItem } = useCart()
+  const { favorites, toggleFavorite } = useFavorites()
 
-  const getCartItem = (productId) => {
-    return cart.find(item => item.id === productId)
+  // Memoize favorite products from Supabase (with fallback)
+  const favoriteProducts = useMemo(() => {
+    const allProducts = products.length > 0 ? products : STATIC_PRODUCTS_FAVORITES
+    return allProducts.filter(product => favorites.includes(product.id))
+  }, [products, favorites])
+
+  // Debug logging
+  React.useEffect(() => {
+    console.log('Favorites page - Products:', products)
+    console.log('Favorites page - Favorites IDs:', favorites)
+    console.log('Favorites page - Favorite Products:', favoriteProducts)
+  }, [products, favorites, favoriteProducts])
+
+  // Show loading state
+  if (productsLoading) {
+    return (
+      <div className="favorites-page">
+        <div className="favorites-container">
+          <h2>Loading favorites from Supabase...</h2>
+        </div>
+      </div>
+    )
   }
 
   return (

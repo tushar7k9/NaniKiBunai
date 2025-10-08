@@ -1,5 +1,19 @@
+/**
+ * Main App Component
+ *
+ * Now using Context Providers for global state management with Supabase!
+ */
+
 import React, { useState } from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+
+// Context Providers
+import { AuthProvider } from './contexts/AuthContext'
+import { ProductsProvider } from './contexts/ProductsContext'
+import { CartProvider } from './contexts/CartContext'
+import { FavoritesProvider } from './contexts/FavoritesContext'
+
+// Components
 import Header from './components/Header'
 import Cart from './components/Cart'
 import Hero from './components/Hero'
@@ -7,67 +21,39 @@ import Categories from './components/Categories'
 import FeaturedProducts from './components/FeaturedProducts'
 import Story from './components/Story'
 import Footer from './components/Footer'
+
+// Pages
 import Products from './pages/Products'
 import ProductDetail from './pages/ProductDetail'
 import Favorites from './pages/Favorites'
 import Collections from './pages/Collections'
 import Contact from './pages/Contact'
 import OurStory from './pages/OurStory'
+import Login from './pages/Login'
+import Register from './pages/Register'
+import Profile from './pages/Profile'
+
 import './App.css'
 
-function App() {
-  const [cart, setCart] = useState([])
-  const [favorites, setFavorites] = useState([])
+// Import hooks
+import { useCart } from './hooks/useCart'
+import { useFavorites } from './hooks/useFavorites'
+
+/**
+ * Main App Content (wrapped by providers)
+ */
+function AppContent() {
   const [isCartOpen, setIsCartOpen] = useState(false)
 
-  const addToCart = (product) => {
-    // Check if product already exists in cart
-    const existingItemIndex = cart.findIndex(item => item.id === product.id)
-
-    if (existingItemIndex !== -1) {
-      // Update quantity if product exists
-      const updatedCart = [...cart]
-      updatedCart[existingItemIndex].quantity = product.quantity
-      setCart(updatedCart)
-    } else {
-      // Add new product to cart
-      setCart([...cart, product])
-    }
-  }
-
-  const updateQuantity = (productId, newQuantity) => {
-    if (newQuantity < 1) {
-      removeFromCart(productId)
-      return
-    }
-
-    const updatedCart = cart.map(item =>
-      item.id === productId ? { ...item, quantity: newQuantity } : item
-    )
-    setCart(updatedCart)
-  }
-
-  const removeFromCart = (productId) => {
-    setCart(cart.filter(item => item.id !== productId))
-  }
-
-  const getTotalItems = () => {
-    return cart.reduce((total, item) => total + item.quantity, 0)
-  }
-
-  const toggleFavorite = (productId) => {
-    if (favorites.includes(productId)) {
-      setFavorites(favorites.filter(id => id !== productId))
-    } else {
-      setFavorites([...favorites, productId])
-    }
-  }
+  // Get cart and favorites from context
+  const { cart, getTotalItems, updateQuantity, removeFromCart } = useCart()
+  const { favorites, getFavoritesCount } = useFavorites()
 
   const HomePage = () => (
     <>
       <Hero />
       <Categories />
-      <FeaturedProducts addToCart={addToCart} />
+      <FeaturedProducts />
       <Story />
     </>
   )
@@ -77,9 +63,9 @@ function App() {
       <div className="App">
         <Header
           cartCount={getTotalItems()}
-          favoritesCount={favorites.length}
+          favoritesCount={getFavoritesCount()}
           onCartClick={() => setIsCartOpen(true)}
-          onFavoritesClick={() => {}}
+          onFavoritesClick={() => {/* Will navigate to /favorites */}}
         />
         <Cart
           isOpen={isCartOpen}
@@ -90,16 +76,41 @@ function App() {
         />
         <Routes>
           <Route path="/" element={<HomePage />} />
-          <Route path="/products" element={<Products addToCart={addToCart} cart={cart} favorites={favorites} toggleFavorite={toggleFavorite} />} />
-          <Route path="/product/:id" element={<ProductDetail addToCart={addToCart} cart={cart} favorites={favorites} toggleFavorite={toggleFavorite} />} />
-          <Route path="/favorites" element={<Favorites favorites={favorites} toggleFavorite={toggleFavorite} addToCart={addToCart} cart={cart} />} />
+          <Route path="/products" element={<Products />} />
+          <Route path="/product/:id" element={<ProductDetail />} />
+          <Route path="/favorites" element={<Favorites />} />
           <Route path="/collections" element={<Collections />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/our-story" element={<OurStory />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/profile" element={<Profile />} />
         </Routes>
         <Footer />
       </div>
     </Router>
+  )
+}
+
+/**
+ * App Component with Context Providers
+ *
+ * Provider hierarchy matters!
+ * AuthProvider must be outermost (others depend on auth)
+ * ProductsProvider is independent
+ * CartProvider and FavoritesProvider depend on AuthProvider
+ */
+function App() {
+  return (
+    <AuthProvider>
+      <ProductsProvider>
+        <CartProvider>
+          <FavoritesProvider>
+            <AppContent />
+          </FavoritesProvider>
+        </CartProvider>
+      </ProductsProvider>
+    </AuthProvider>
   )
 }
 

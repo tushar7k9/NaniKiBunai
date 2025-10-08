@@ -2,9 +2,13 @@ import React, { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FiHeart, FiShoppingCart, FiFilter, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
+import { useProducts } from '../hooks/useProducts'
+import { useCart } from '../hooks/useCart'
+import { useFavorites } from '../hooks/useFavorites'
 import './Products.css'
 
-const productsData = [
+// Fallback static data (not used anymore - kept for reference)
+const productsDataFallback = [
   {
     id: 1,
     name: 'Cozy Winter Scarf',
@@ -194,13 +198,11 @@ const sortOptions = [
   { id: 'name', name: 'Name: A-Z' }
 ]
 
-const ProductCard = ({ product, addToCart, isFavorite, toggleFavorite, cartItem }) => {
+const ProductCard = ({ product, addToCart, isFavorite, toggleFavorite }) => {
   const navigate = useNavigate()
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
-
-  // Sync with cart state
-  const isInCart = cartItem !== undefined
-  const quantity = cartItem?.quantity || 1
+  const [selectedColor, setSelectedColor] = useState(0) // Index of selected color
+  const [selectedSize, setSelectedSize] = useState(product.sizes?.[0] || 'S') // Default first size
 
   const nextImage = (e) => {
     e.stopPropagation()
@@ -214,24 +216,14 @@ const ProductCard = ({ product, addToCart, isFavorite, toggleFavorite, cartItem 
     )
   }
 
-  const incrementQuantity = (e) => {
-    e.stopPropagation()
-    const newQuantity = quantity + 1
-    addToCart({ ...product, quantity: newQuantity })
-  }
-
-  const decrementQuantity = (e) => {
-    e.stopPropagation()
-    const newQuantity = quantity - 1
-    if (newQuantity > 0) {
-      addToCart({ ...product, quantity: newQuantity })
-    }
-    // If quantity becomes 0, the cart will handle removal
-  }
-
   const handleAddToCart = (e) => {
     e.stopPropagation()
-    addToCart({ ...product, quantity: 1 })
+    addToCart({
+      ...product,
+      quantity: 1,
+      selectedColor: product.colors[selectedColor],
+      selectedSize: selectedSize
+    })
   }
 
   const handleCardClick = () => {
@@ -303,17 +295,43 @@ const ProductCard = ({ product, addToCart, isFavorite, toggleFavorite, cartItem 
         <h3 className="product-name">{product.name}</h3>
         <p className="product-description">{product.description}</p>
 
-        {/* Color palette */}
+        {/* Color palette - Interactive selection */}
         <div className="product-colors">
           {product.colors.map((color, i) => (
             <motion.span
               key={i}
-              className="color-dot"
+              className={`color-dot ${i === selectedColor ? 'selected' : ''}`}
               style={{ backgroundColor: color }}
+              onClick={(e) => {
+                e.stopPropagation()
+                setSelectedColor(i)
+              }}
               whileHover={{ scale: 1.3 }}
+              whileTap={{ scale: 0.9 }}
+              title={color}
             />
           ))}
         </div>
+
+        {/* Size selector - Interactive selection */}
+        {product.sizes && product.sizes.length > 0 && (
+          <div className="product-sizes">
+            {product.sizes.map((size) => (
+              <motion.button
+                key={size}
+                className={`size-option ${selectedSize === size ? 'selected' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setSelectedSize(size)
+                }}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                {size}
+              </motion.button>
+            ))}
+          </div>
+        )}
 
         <div className="product-meta">
           <span className="difficulty-badge">{product.difficulty}</span>
@@ -322,66 +340,41 @@ const ProductCard = ({ product, addToCart, isFavorite, toggleFavorite, cartItem 
         <div className="product-footer">
           <span className="product-price">${product.price}</span>
 
-          {/* Show Add to Cart button OR Quantity Controls */}
-          {!isInCart ? (
-            <motion.button
-              className="add-to-cart-btn"
-              onClick={handleAddToCart}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <FiShoppingCart /> Add to Cart
-            </motion.button>
-          ) : (
-            <motion.div
-              className="quantity-selector"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <span className="quantity-label">Quantity:</span>
-              <div className="quantity-controls">
-                <motion.button
-                  className="quantity-btn"
-                  onClick={decrementQuantity}
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                >
-                  -
-                </motion.button>
-                <span className="quantity-value">{quantity}</span>
-                <motion.button
-                  className="quantity-btn"
-                  onClick={incrementQuantity}
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                >
-                  +
-                </motion.button>
-              </div>
-            </motion.div>
-          )}
+          {/* Always show Add to Cart button */}
+          <motion.button
+            className="add-to-cart-btn"
+            onClick={handleAddToCart}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <FiShoppingCart /> Add to Cart
+          </motion.button>
         </div>
       </div>
     </motion.div>
   )
 }
 
-const Products = ({ addToCart, cart = [], favorites = [], toggleFavorite }) => {
+const Products = () => {
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [sortBy, setSortBy] = useState('featured')
   const [showFilters, setShowFilters] = useState(false)
 
-  const getCartItem = (productId) => {
-    return cart.find(item => item.id === productId)
-  }
+  // Get data from context hooks
+  const { products, loading: productsLoading } = useProducts()
+  const { addToCart } = useCart();
+  const { favorites, toggleFavorite } = useFavorites()
+
+  // Debug: Log products when they change
+  React.useEffect(() => {
+    console.log('Products in Products page:', products)
+    console.log('Products count:', products.length)
+  }, [products])
 
   const filteredAndSortedProducts = useMemo(() => {
     let filtered = selectedCategory === 'all'
-      ? productsData
-      : productsData.filter(p => p.category === selectedCategory)
+      ? products
+      : products.filter(p => p.category === selectedCategory)
 
     let sorted = [...filtered]
     switch (sortBy) {
@@ -399,7 +392,27 @@ const Products = ({ addToCart, cart = [], favorites = [], toggleFavorite }) => {
     }
 
     return sorted
-  }, [selectedCategory, sortBy])
+  }, [products, selectedCategory, sortBy])
+
+  // Show loading state
+  if (productsLoading) {
+    return (
+      <div className="products-page">
+        <div
+          style={{
+            minHeight: "50vh",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "18px",
+            color: "#666",
+          }}
+        >
+          Loading products from Garage...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="products-page">
@@ -431,12 +444,12 @@ const Products = ({ addToCart, cart = [], favorites = [], toggleFavorite }) => {
             className="floating-needle needle-1"
             animate={{
               y: [-10, 10, -10],
-              rotate: [0, 5, 0]
+              rotate: [0, 5, 0],
             }}
             transition={{
               duration: 4,
               repeat: Infinity,
-              ease: "easeInOut"
+              ease: "easeInOut",
             }}
           >
             🪡
@@ -445,12 +458,12 @@ const Products = ({ addToCart, cart = [], favorites = [], toggleFavorite }) => {
             className="floating-needle needle-2"
             animate={{
               y: [10, -10, 10],
-              rotate: [0, -5, 0]
+              rotate: [0, -5, 0],
             }}
             transition={{
               duration: 5,
               repeat: Infinity,
-              ease: "easeInOut"
+              ease: "easeInOut",
             }}
           >
             🪡
@@ -474,11 +487,11 @@ const Products = ({ addToCart, cart = [], favorites = [], toggleFavorite }) => {
               className="mobile-filter-toggle"
               onClick={() => setShowFilters(!showFilters)}
             >
-              {showFilters ? 'Hide' : 'Show'} Filters
+              {showFilters ? "Hide" : "Show"} Filters
             </button>
           </div>
 
-          <div className={`filters-content ${showFilters ? 'show' : ''}`}>
+          <div className={`filters-content ${showFilters ? "show" : ""}`}>
             {/* Categories */}
             <div className="filter-group">
               <h3>Categories</h3>
@@ -486,7 +499,9 @@ const Products = ({ addToCart, cart = [], favorites = [], toggleFavorite }) => {
                 {categories.map((cat) => (
                   <motion.button
                     key={cat.id}
-                    className={`category-btn ${selectedCategory === cat.id ? 'active' : ''}`}
+                    className={`category-btn ${
+                      selectedCategory === cat.id ? "active" : ""
+                    }`}
                     onClick={() => setSelectedCategory(cat.id)}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
@@ -506,8 +521,10 @@ const Products = ({ addToCart, cart = [], favorites = [], toggleFavorite }) => {
                 onChange={(e) => setSortBy(e.target.value)}
                 className="sort-select"
               >
-                {sortOptions.map(opt => (
-                  <option key={opt.id} value={opt.id}>{opt.name}</option>
+                {sortOptions.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -517,12 +534,12 @@ const Products = ({ addToCart, cart = [], favorites = [], toggleFavorite }) => {
               className="filter-decoration"
               animate={{
                 rotate: [0, 360],
-                scale: [1, 1.1, 1]
+                scale: [1, 1.1, 1],
               }}
               transition={{
                 duration: 20,
                 repeat: Infinity,
-                ease: "linear"
+                ease: "linear",
               }}
             >
               🧵
@@ -532,10 +549,7 @@ const Products = ({ addToCart, cart = [], favorites = [], toggleFavorite }) => {
 
         {/* Products Grid */}
         <div className="products-main">
-          <motion.div
-            className="products-grid"
-            layout
-          >
+          <motion.div className="products-grid" layout>
             <AnimatePresence mode="popLayout">
               {filteredAndSortedProducts.map((product) => (
                 <ProductCard
@@ -544,7 +558,6 @@ const Products = ({ addToCart, cart = [], favorites = [], toggleFavorite }) => {
                   addToCart={addToCart}
                   isFavorite={favorites.includes(product.id)}
                   toggleFavorite={toggleFavorite}
-                  cartItem={getCartItem(product.id)}
                 />
               ))}
             </AnimatePresence>
@@ -559,7 +572,7 @@ const Products = ({ addToCart, cart = [], favorites = [], toggleFavorite }) => {
             >
               <span className="no-results-emoji">🧶</span>
               <p>No products found in this category</p>
-              <button onClick={() => setSelectedCategory('all')}>
+              <button onClick={() => setSelectedCategory("all")}>
                 View All Products
               </button>
             </motion.div>
@@ -573,12 +586,12 @@ const Products = ({ addToCart, cart = [], favorites = [], toggleFavorite }) => {
         animate={{
           x: [-20, 20, -20],
           y: [-20, 20, -20],
-          rotate: [0, 360]
+          rotate: [0, 360],
         }}
         transition={{
           duration: 15,
           repeat: Infinity,
-          ease: "easeInOut"
+          ease: "easeInOut",
         }}
       >
         🧶
@@ -588,18 +601,18 @@ const Products = ({ addToCart, cart = [], favorites = [], toggleFavorite }) => {
         animate={{
           x: [20, -20, 20],
           y: [20, -20, 20],
-          rotate: [360, 0]
+          rotate: [360, 0],
         }}
         transition={{
           duration: 18,
           repeat: Infinity,
-          ease: "easeInOut"
+          ease: "easeInOut",
         }}
       >
         🧶
       </motion.div>
     </div>
-  )
+  );
 }
 
 export default Products

@@ -378,7 +378,71 @@
   border: 2px solid white;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   cursor: pointer;
-  transition: transform 0.2s ease;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.color-dot:hover {
+  transform: scale(1.2);
+}
+
+/* Default selected color indicator */
+.color-dot.selected {
+  border: 3px solid var(--terracotta);
+  box-shadow: 0 0 0 2px white, 0 0 0 4px var(--terracotta), 0 4px 12px rgba(196, 137, 106, 0.4);
+  transform: scale(1.15);
+}
+
+.color-dot.selected::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Size Selector - Interactive on Products page */
+.product-sizes {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.size-option {
+  min-width: 40px;
+  height: 40px;
+  padding: 0 0.8rem;
+  border: 2px solid #ffd7a8;
+  border-radius: 8px;
+  background: white;
+  color: #8B4513;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.size-option:hover {
+  border-color: #d4a574;
+  background: #fff4e6;
+  transform: translateY(-2px);
+}
+
+.size-option.selected {
+  border: 3px solid var(--terracotta);
+  background: linear-gradient(135deg, #d4a574 0%, #b8936e 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(196, 137, 106, 0.4);
+  transform: scale(1.1);
 }
 
 .product-info {

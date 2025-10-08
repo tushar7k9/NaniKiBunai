@@ -105,13 +105,25 @@ const Cart = ({ isOpen, onClose, cartItems, updateQuantity, removeFromCart }) =>
                       <div className="cart-item-details">
                         <h4 className="cart-item-name">{item.name}</h4>
                         <p className="cart-item-price">${item.price}</p>
-                        {item.selectedColor && (
-                          <div className="cart-item-color">
-                            <span>Color:</span>
-                            <div
-                              className="color-indicator"
-                              style={{ backgroundColor: item.selectedColor }}
-                            />
+
+                        {/* Color and Size - Horizontal Layout */}
+                        {((item.selectedColor || item.selected_color) || (item.selectedSize || item.selected_size)) && (
+                          <div className="cart-item-variants">
+                            {(item.selectedColor || item.selected_color) && (
+                              <div className="cart-item-color">
+                                <span>Color:</span>
+                                <div
+                                  className="color-indicator"
+                                  style={{ backgroundColor: item.selectedColor || item.selected_color }}
+                                />
+                              </div>
+                            )}
+                            {(item.selectedSize || item.selected_size) && (
+                              <div className="cart-item-size">
+                                <span>Size: </span>
+                                <span className="size-value">{item.selectedSize || item.selected_size}</span>
+                              </div>
+                            )}
                           </div>
                         )}
 
@@ -119,7 +131,7 @@ const Cart = ({ isOpen, onClose, cartItems, updateQuantity, removeFromCart }) =>
                         <div className="cart-item-quantity">
                           <motion.button
                             className="quantity-btn-cart"
-                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                            onClick={() => updateQuantity(item.id, item.quantity - 1, item.selectedColor || item.selected_color, item.selectedSize || item.selected_size)}
                             whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.9 }}
                             disabled={item.quantity <= 1}
@@ -129,7 +141,7 @@ const Cart = ({ isOpen, onClose, cartItems, updateQuantity, removeFromCart }) =>
                           <span className="quantity-display">{item.quantity}</span>
                           <motion.button
                             className="quantity-btn-cart"
-                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                            onClick={() => updateQuantity(item.id, item.quantity + 1, item.selectedColor || item.selected_color, item.selectedSize || item.selected_size)}
                             whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.9 }}
                           >
@@ -145,7 +157,12 @@ const Cart = ({ isOpen, onClose, cartItems, updateQuantity, removeFromCart }) =>
                         </div>
                         <motion.button
                           className="remove-item-btn"
-                          onClick={() => removeFromCart(item.id)}
+                          onClick={() => removeFromCart(
+                            item.id,
+                            item.selectedColor || item.selected_color,
+                            item.selectedSize || item.selected_size,
+                            item.cart_item_id
+                          )}
                           whileHover={{ scale: 1.1, color: '#ff6b6b' }}
                           whileTap={{ scale: 0.9 }}
                         >

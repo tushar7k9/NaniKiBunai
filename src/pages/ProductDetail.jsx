@@ -2,9 +2,13 @@ import React, { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { FiHeart, FiShoppingCart, FiChevronLeft, FiChevronRight, FiStar, FiArrowLeft } from 'react-icons/fi'
+import { useProducts } from '../hooks/useProducts'
+import { useCart } from '../hooks/useCart'
+import { useFavorites } from '../hooks/useFavorites'
 import './ProductDetail.css'
 
-const productsData = [
+// Static product data with additional details for fallback
+const STATIC_PRODUCTS_DETAIL = [
   {
     id: 1,
     name: 'Cozy Winter Scarf',
@@ -164,30 +168,44 @@ const reviews = {
   ]
 }
 
-const ProductDetail = ({ addToCart, cart = [], favorites = [], toggleFavorite }) => {
+const ProductDetail = () => {
   const { id } = useParams()
   const navigate = useNavigate()
-  const product = productsData.find(p => p.id === parseInt(id))
-  const productReviews = reviews[parseInt(id)] || []
 
-  // Find this product in cart
-  const cartItem = cart.find(item => item.id === parseInt(id))
+  // Use context hooks
+  const { products, loading: productsLoading, getProductById } = useProducts()
+  const { addToCart } = useCart()
+  const { favorites, toggleFavorite } = useFavorites()
+
+  // Get product from Supabase (with fallback to static data)
+  const supabaseProduct = getProductById(id)
+  const staticProduct = STATIC_PRODUCTS_DETAIL.find(p => p.id === parseInt(id))
+  const product = supabaseProduct || staticProduct
+
+  const productReviews = reviews[parseInt(id)] || []
 
   // Check if this product is in favorites
   const isFavorite = favorites.includes(parseInt(id))
 
-  const [currentImageIndex, setCurrentImageIndex] = useState(0)
-  const [quantity, setQuantity] = useState(cartItem?.quantity || 1)
-  const [selectedColor, setSelectedColor] = useState(0)
-
-  // Sync quantity with cart when cart changes
+  // Debug logging
   React.useEffect(() => {
-    if (cartItem) {
-      setQuantity(cartItem.quantity)
-    } else {
-      setQuantity(1)
-    }
-  }, [cartItem])
+    console.log('ProductDetail - Product ID:', id)
+    console.log('ProductDetail - Supabase Product:', supabaseProduct)
+    console.log('ProductDetail - Final Product:', product)
+  }, [id, supabaseProduct, product])
+
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [selectedColor, setSelectedColor] = useState(0)
+  const [selectedSize, setSelectedSize] = useState('S') // Default size is S
+
+  // Show loading state
+  if (productsLoading) {
+    return (
+      <div className="product-not-found">
+        <h2>Loading product from Supabase...</h2>
+      </div>
+    )
+  }
 
   if (!product) {
     return (
@@ -208,25 +226,9 @@ const ProductDetail = ({ addToCart, cart = [], favorites = [], toggleFavorite })
     )
   }
 
-  const incrementQuantity = () => {
-    const newQuantity = quantity + 1
-    setQuantity(newQuantity)
-    // Immediately update cart
-    addToCart({ ...product, quantity: newQuantity, selectedColor: product.colors[selectedColor] })
-  }
-
-  const decrementQuantity = () => {
-    if (quantity > 1) {
-      const newQuantity = quantity - 1
-      setQuantity(newQuantity)
-      // Immediately update cart
-      addToCart({ ...product, quantity: newQuantity, selectedColor: product.colors[selectedColor] })
-    }
-  }
-
   const handleAddToCart = () => {
-    // Add to cart with current quantity
-    addToCart({ ...product, quantity, selectedColor: product.colors[selectedColor] })
+    // Add to cart with quantity 1
+    addToCart({ ...product, quantity: 1, selectedColor: product.colors[selectedColor], selectedSize })
   }
 
   const renderStars = (rating) => {
@@ -346,6 +348,26 @@ const ProductDetail = ({ addToCart, cart = [], favorites = [], toggleFavorite })
             </div>
           </div>
 
+          {/* Size Selection */}
+          {product.sizes && product.sizes.length > 0 && (
+            <div className="size-selection">
+              <h3>Select Size:</h3>
+              <div className="size-options">
+                {product.sizes.map((size) => (
+                  <motion.button
+                    key={size}
+                    className={`size-option-detail ${selectedSize === size ? 'selected' : ''}`}
+                    onClick={() => setSelectedSize(size)}
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    {size}
+                  </motion.button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Product Details */}
           <div className="product-specs">
             <h3>Product Details:</h3>
@@ -363,30 +385,6 @@ const ProductDetail = ({ addToCart, cart = [], favorites = [], toggleFavorite })
             <p>{product.careInstructions}</p>
           </div>
 
-          {/* Quantity Selector */}
-          <div className="quantity-section">
-            <h3>Quantity:</h3>
-            <div className="quantity-controls-detail">
-              <motion.button
-                className="quantity-btn-detail"
-                onClick={decrementQuantity}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-              >
-                -
-              </motion.button>
-              <span className="quantity-value-detail">{quantity}</span>
-              <motion.button
-                className="quantity-btn-detail"
-                onClick={incrementQuantity}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-              >
-                +
-              </motion.button>
-            </div>
-          </div>
-
           {/* Add to Cart Button */}
           <motion.button
             className="add-to-cart-btn-detail"
@@ -394,7 +392,7 @@ const ProductDetail = ({ addToCart, cart = [], favorites = [], toggleFavorite })
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
-            <FiShoppingCart /> Add to Cart - ${product.price * quantity}
+            <FiShoppingCart /> Add to Cart - ${product.price}
           </motion.button>
         </motion.div>
       </div>
