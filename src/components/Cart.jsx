@@ -1,9 +1,11 @@
 import React from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FiX, FiPlus, FiMinus, FiTrash2, FiShoppingBag } from 'react-icons/fi'
 import './Cart.css'
 
 const Cart = ({ isOpen, onClose, cartItems, updateQuantity, removeFromCart }) => {
+  const navigate = useNavigate()
   const calculateTotal = () => {
     return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0)
   }
@@ -185,6 +187,10 @@ const Cart = ({ isOpen, onClose, cartItems, updateQuantity, removeFromCart }) =>
                 <p className="cart-note">Shipping & taxes calculated at checkout</p>
                 <motion.button
                   className="checkout-btn"
+                  onClick={() => {
+                    onClose()
+                    navigate('/checkout')
+                  }}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
