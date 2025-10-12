@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FiArrowLeft, FiCreditCard, FiTruck, FiShoppingBag, FiLock, FiMessageSquare, FiX } from 'react-icons/fi'
@@ -35,6 +35,9 @@ const Checkout = () => {
   const [isProcessing, setIsProcessing] = useState(false)
   const [productInstructions, setProductInstructions] = useState({})
   const [activeInstructionIndex, setActiveInstructionIndex] = useState(null)
+  const [popupPosition, setPopupPosition] = useState({ top: 0, left: 0, isAbove: false })
+  
+  const summaryItemsRef = useRef(null)
 
   const shippingCost = 10
   const tax = getTotalPrice() * 0.08 // 8% tax
@@ -48,11 +51,83 @@ const Checkout = () => {
     }))
   }
 
+  // Close popup on scroll
+  useEffect(() => {
+    const summaryItems = summaryItemsRef.current
+    if (summaryItems && activeInstructionIndex !== null) {
+      const handleScroll = () => {
+        setActiveInstructionIndex(null)
+      }
+      
+      summaryItems.addEventListener('scroll', handleScroll)
+      return () => summaryItems.removeEventListener('scroll', handleScroll)
+    }
+  }, [activeInstructionIndex])
+
+  // Prevent body scroll when popup is open
+  useEffect(() => {
+    if (activeInstructionIndex !== null) {
+      // Disable scroll
+      document.body.style.overflow = 'hidden'
+    } else {
+      // Re-enable scroll
+      document.body.style.overflow = 'auto'
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      document.body.style.overflow = 'auto'
+    }
+  }, [activeInstructionIndex])
+
   // Toggle instruction popup
-  const toggleInstructionPopup = (index) => {
-      setActiveInstructionIndex(
-        activeInstructionIndex === index ? null : index
-      );
+  const toggleInstructionPopup = (index, event) => {
+    if (activeInstructionIndex === index) {
+      setActiveInstructionIndex(null)
+    } else {
+      // Get button position
+      const button = event.currentTarget
+      const rect = button.getBoundingClientRect()
+      const windowWidth = window.innerWidth
+      const windowHeight = window.innerHeight
+      
+      // Calculate position based on screen size
+      if (windowWidth <= 768) {
+        // Mobile/Tablet: center on screen
+        setPopupPosition({ top: 0, left: 0, isAbove: false })
+      } else {
+        // Desktop: position below button with boundary detection
+        const popupWidth = 420
+        const popupHeight = 400 // approximate height
+        
+        // Calculate left position (ensure it doesn't go off-screen)
+        let left = rect.right - popupWidth
+        if (left < 10) left = 10 // min 10px from left edge
+        if (left + popupWidth > windowWidth - 10) {
+          left = windowWidth - popupWidth - 10 // max 10px from right edge
+        }
+        
+        // Calculate top position and determine if popup should be above or below
+        let top = rect.bottom + 10
+        let isAbove = false
+        
+        // If popup would go below viewport, show it above the button
+        if (top + popupHeight > windowHeight - 20) {
+          top = rect.top - popupHeight - 10
+          isAbove = true
+          
+          // If still not enough space above, center it
+          if (top < 20) {
+            top = (windowHeight - popupHeight) / 2
+            isAbove = false // centered, so no arrow positioning needed
+          }
+        }
+        
+        setPopupPosition({ top, left, isAbove })
+      }
+      
+      setActiveInstructionIndex(index)
+    }
   };
 
   // Handle form submission
@@ -272,7 +347,7 @@ const Checkout = () => {
         >
           <h2>Order Summary</h2>
 
-          <div className="summary-items">
+          <div className="summary-items" ref={summaryItemsRef}>
             {cart.map((item, index) => (
               <div key={`${item.id}-${index}`} className="summary-item">
                 <img
@@ -303,7 +378,7 @@ const Checkout = () => {
                     <motion.button
                       type="button"
                       className={`instruction-icon ${productInstructions[index] ? 'has-instruction' : ''}`}
-                      onClick={() => toggleInstructionPopup(index)}
+                      onClick={(e) => toggleInstructionPopup(index, e)}
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.95 }}
                       title="Add special instructions"
@@ -322,7 +397,11 @@ const Checkout = () => {
                             onClick={() => setActiveInstructionIndex(null)}
                           />
                           <motion.div
-                            className="instruction-popup"
+                            className={`instruction-popup ${popupPosition.isAbove ? 'popup-above' : ''}`}
+                            style={window.innerWidth > 768 ? {
+                              top: `${popupPosition.top}px`,
+                              left: `${popupPosition.left}px`,
+                            } : {}}
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.9 }}

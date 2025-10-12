@@ -217,7 +217,7 @@
   height: fit-content;
   position: sticky;
   top: 100px;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .order-summary h2 {
@@ -234,11 +234,6 @@
   overflow-y: auto;
   margin-bottom: 1.5rem;
   padding-right: 0.5rem;
-}
-
-/* Allow popups to overflow when needed */
-.summary-items:has(.instruction-popup) {
-  overflow: visible;
 }
 
 .summary-item {
@@ -353,7 +348,7 @@
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
-  z-index: 999;
+  z-index: 9999;
   backdrop-filter: blur(2px);
 }
 
@@ -370,29 +365,29 @@
   border-radius: 20px;
   box-shadow: 0 10px 40px rgba(139, 69, 19, 0.3);
   padding: 1.5rem;
-  z-index: 1000;
+  z-index: 10000;
 }
 
-/* Desktop: position below icon */
+/* Desktop: position at calculated coordinates */
 @media (min-width: 769px) {
   .instruction-popup {
-    position: absolute;
-    top: calc(100% + 10px);
-    right: 0;
-    left: auto;
+    position: fixed;
     transform: none;
     width: 420px;
     max-width: 420px;
+    top: auto;
+    left: auto;
   }
 }
 
 /* Arrow pointer for popup - only on desktop */
 @media (min-width: 769px) {
+  /* Arrow at top (popup below button) */
   .instruction-popup::before {
     content: '';
     position: absolute;
     top: -12px;
-    right: 8px;
+    right: 20px;
     width: 0;
     height: 0;
     border-left: 12px solid transparent;
@@ -404,12 +399,27 @@
     content: '';
     position: absolute;
     top: -8px;
-    right: 10px;
+    right: 22px;
     width: 0;
     height: 0;
     border-left: 10px solid transparent;
     border-right: 10px solid transparent;
     border-bottom: 10px solid white;
+  }
+
+  /* Arrow at bottom (popup above button) */
+  .instruction-popup.popup-above::before {
+    top: auto;
+    bottom: -12px;
+    border-bottom: none;
+    border-top: 12px solid #ffd7a8;
+  }
+
+  .instruction-popup.popup-above::after {
+    top: auto;
+    bottom: -8px;
+    border-bottom: none;
+    border-top: 10px solid white;
   }
 }
 
