@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { FiShoppingCart, FiMenu, FiX, FiSearch, FiHeart, FiUser, FiLogOut } from 'react-icons/fi'
+import { FiShoppingCart, FiMenu, FiX, FiSearch, FiHeart, FiUser, FiLogOut, FiPackage } from 'react-icons/fi'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import './Header.css'
@@ -67,7 +67,7 @@ const Header = ({ cartCount, favoritesCount, onCartClick, onFavoritesClick }) =>
 
         <nav className={`header-nav ${isMobileMenuOpen ? 'open' : ''}`}>
           <a href="/">Home</a>
-          <a href="/collections">Collections</a>
+          {/* <a href="/collections">Collections</a> */}
           <a href="/products">Products</a>
           <a href="/our-story">Our Story</a>
           <a href="/contact">Contact</a>
@@ -159,6 +159,17 @@ const Header = ({ cartCount, favoritesCount, onCartClick, onFavoritesClick }) =>
                   >
                     <FiUser />
                     <span>My Profile</span>
+                  </button>
+
+                  <button
+                    className="dropdown-item"
+                    onClick={() => {
+                      setIsUserMenuOpen(false)
+                      navigate('/orders')
+                    }}
+                  >
+                    <FiPackage />
+                    <span>My Orders</span>
                   </button>
 
                   <button

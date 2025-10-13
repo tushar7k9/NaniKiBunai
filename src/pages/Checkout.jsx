@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { FiArrowLeft, FiCreditCard, FiTruck, FiShoppingBag, FiLock, FiMessageSquare, FiX } from 'react-icons/fi'
 import { useCart } from '../hooks/useCart'
 import { useAuth } from '../hooks/useAuth'
+import { orderService } from '../services/orderService'
 import './Checkout.css'
 
 const Checkout = () => {
@@ -21,7 +22,7 @@ const Checkout = () => {
     city: '',
     state: '',
     zipCode: '',
-    country: 'United States',
+    country: 'India',
   })
 
   const [paymentInfo, setPaymentInfo] = useState({
@@ -36,7 +37,8 @@ const Checkout = () => {
   const [productInstructions, setProductInstructions] = useState({})
   const [activeInstructionIndex, setActiveInstructionIndex] = useState(null)
   const [popupPosition, setPopupPosition] = useState({ top: 0, left: 0, isAbove: false })
-  
+  const [orderError, setOrderError] = useState(null)
+
   const summaryItemsRef = useRef(null)
 
   const shippingCost = 10
@@ -134,24 +136,71 @@ const Checkout = () => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setIsProcessing(true)
+    setOrderError(null)
 
-    // Simulate payment processing
-    setTimeout(() => {
-      console.log('Order placed:', {
-        shippingInfo,
-        paymentInfo,
-        orderNotes,
+    try {
+      // Prepare shipping address
+      const shippingAddress = {
+        firstName: shippingInfo.firstName,
+        lastName: shippingInfo.lastName,
+        address: shippingInfo.address,
+        city: shippingInfo.city,
+        state: shippingInfo.state,
+        zipCode: shippingInfo.zipCode,
+        country: shippingInfo.country,
+      }
+
+      // Prepare order data
+      const orderData = {
+        shippingAddress,
+        billingAddress: shippingAddress, // Using same as shipping for now
+        customerEmail: shippingInfo.email,
+        customerPhone: shippingInfo.phone,
+        items: cart,
+        subtotal: getTotalPrice(),
+        shippingCost,
+        taxAmount: tax,
+        discountAmount: 0,
+        totalAmount: total,
+        customerNotes: orderNotes || null,
         productInstructions,
-        cart,
-        total,
-      })
+        paymentMethod: 'simulated', // Will be updated when payment is integrated
+      }
 
-      // Clear cart and navigate to success page
+      // Create order in database
+      const result = await orderService.createOrder(orderData)
+
+      // Simulate payment processing (will be replaced with actual payment integration)
+      // For now, we'll mark it as paid immediately
+      await orderService.updatePaymentStatus(result.order.id, 'paid', 'simulated-payment-intent')
+      await orderService.updateOrderStatus(result.order.id, 'confirmed')
+
+      console.log('Order created successfully:', result)
+
+      // Clear cart
       clearCart()
       setIsProcessing(false)
-      alert('Order placed successfully! Thank you for your purchase.')
-      navigate('/')
-    }, 2000)
+
+      // Show different messages based on authentication status
+      if (isAuthenticated && user) {
+        // Logged-in user: redirect to orders page
+        alert(`Order placed successfully! Your order number is: ${result.order.order_number}`)
+        navigate('/orders')
+      } else {
+        // Guest user: show message about tracking
+        alert(
+          `Order placed successfully!\n\n` +
+          `Your order number is: ${result.order.order_number}\n\n` +
+          `To track your order status, please log in with the email address: ${shippingInfo.email}\n\n` +
+          `If you don't have an account, you can sign up using the same email to view your order history.`
+        )
+        navigate('/')
+      }
+    } catch (error) {
+      console.error('Error placing order:', error)
+      setOrderError(error.message || 'Failed to place order. Please try again.')
+      setIsProcessing(false)
+    }
   }
 
   const handleShippingChange = (e) => {
@@ -210,6 +259,25 @@ const Checkout = () => {
             <h1>Checkout</h1>
             <p>Complete your order</p>
           </motion.div>
+
+          {/* Error Message */}
+          {orderError && (
+            <motion.div
+              className="error-message"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              style={{
+                padding: '1rem',
+                marginBottom: '1rem',
+                backgroundColor: '#fee',
+                border: '1px solid #fcc',
+                borderRadius: '8px',
+                color: '#c33',
+              }}
+            >
+              {orderError}
+            </motion.div>
+          )}
 
           <form onSubmit={handleSubmit}>
             {/* Shipping Information */}
