@@ -1,10 +1,13 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { FiHeart, FiShoppingCart, FiChevronLeft, FiChevronRight, FiStar, FiArrowLeft } from 'react-icons/fi'
+import { FiHeart, FiShoppingCart, FiChevronLeft, FiChevronRight, FiStar, FiArrowLeft, FiEdit3, FiThumbsUp } from 'react-icons/fi'
 import { useProducts } from '../hooks/useProducts'
 import { useCart } from '../hooks/useCart'
 import { useFavorites } from '../hooks/useFavorites'
+import { useAuth } from '../hooks/useAuth'
+import { reviewService } from '../services/reviewService'
+import ReviewModal from '../components/ReviewModal'
 import './ProductDetail.css'
 
 // Static product data with additional details for fallback
@@ -176,13 +179,19 @@ const ProductDetail = () => {
   const { products, loading: productsLoading, getProductById } = useProducts()
   const { addToCart } = useCart()
   const { favorites, toggleFavorite } = useFavorites()
+  const { isAuthenticated } = useAuth()
 
   // Get product from Supabase (with fallback to static data)
   const supabaseProduct = getProductById(id)
   const staticProduct = STATIC_PRODUCTS_DETAIL.find(p => p.id === parseInt(id))
   const product = supabaseProduct || staticProduct
 
-  const productReviews = reviews[parseInt(id)] || []
+  // Review state
+  const [productReviews, setProductReviews] = useState([])
+  const [reviewStats, setReviewStats] = useState(null)
+  const [userReview, setUserReview] = useState(null)
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false)
+  const [reviewsLoading, setReviewsLoading] = useState(true)
 
   // Check if this product is in favorites
   const isFavorite = favorites.includes(parseInt(id))
@@ -197,6 +206,83 @@ const ProductDetail = () => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [selectedColor, setSelectedColor] = useState(0)
   const [selectedSize, setSelectedSize] = useState('S') // Default size is S
+
+  // Fetch reviews when component mounts or product changes
+  useEffect(() => {
+    if (product) {
+      fetchReviews()
+      if (isAuthenticated) {
+        fetchUserReview()
+      }
+    }
+  }, [product, isAuthenticated])
+
+  const fetchReviews = async () => {
+    try {
+      setReviewsLoading(true)
+      const [reviews, stats] = await Promise.all([
+        reviewService.getProductReviews(product.id),
+        reviewService.getProductReviewStats(product.id),
+      ])
+      setProductReviews(reviews)
+      setReviewStats(stats)
+    } catch (error) {
+      console.error('Error fetching reviews:', error)
+    } finally {
+      setReviewsLoading(false)
+    }
+  }
+
+  const fetchUserReview = async () => {
+    try {
+      const review = await reviewService.getUserReview(product.id)
+      setUserReview(review)
+    } catch (error) {
+      console.error('Error fetching user review:', error)
+    }
+  }
+
+  const handleReviewModalClose = (success) => {
+    setIsReviewModalOpen(false)
+    if (success) {
+      // Refresh reviews after successful submission
+      fetchReviews()
+      if (isAuthenticated) {
+        fetchUserReview()
+      }
+    }
+  }
+
+  const handleWriteReview = () => {
+    if (!isAuthenticated) {
+      alert('Please log in to write a review')
+      navigate('/login')
+      return
+    }
+    setIsReviewModalOpen(true)
+  }
+
+  const handleMarkHelpful = async (reviewId) => {
+    try {
+      await reviewService.markReviewHelpful(reviewId)
+      fetchReviews() // Refresh to show updated count
+    } catch (error) {
+      console.error('Error marking review as helpful:', error)
+    }
+  }
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    })
+  }
+
+  const isUserOwnReview = (review) => {
+    return userReview && userReview.id === review.id
+  }
 
   // Show loading state
   if (productsLoading) {
@@ -317,14 +403,17 @@ const ProductDetail = () => {
         >
           <div className="product-header">
             <h1 className="product-title">{product.name}</h1>
-            <div className="product-rating">
-              <div className="stars">
-                {renderStars(product.rating)}
+            {!reviewsLoading && reviewStats && (
+              <div className="product-rating">
+                <div className="stars">
+                  {renderStars(reviewStats.averageRating)}
+                </div>
+                <span className="rating-text">
+                  {reviewStats.averageRating > 0 ? reviewStats.averageRating : 'No rating yet'}
+                  {reviewStats.totalReviews > 0 && ` (${reviewStats.totalReviews} ${reviewStats.totalReviews === 1 ? 'review' : 'reviews'})`}
+                </span>
               </div>
-              <span className="rating-text">
-                {product.rating} ({product.reviewCount} reviews)
-              </span>
-            </div>
+            )}
           </div>
 
           <div className="product-price-large">${product.price}</div>
@@ -404,41 +493,155 @@ const ProductDetail = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, delay: 0.4 }}
       >
-        <h2>Customer Reviews</h2>
-        <div className="reviews-summary">
-          <div className="rating-overview">
-            <div className="large-rating">{product.rating}</div>
-            <div className="stars-large">
-              {renderStars(product.rating)}
-            </div>
-            <div className="review-count-text">Based on {product.reviewCount} reviews</div>
-          </div>
+        <div className="reviews-header">
+          <h2>Customer Reviews</h2>
+          {/* Only show write review button when there are existing reviews */}
+          {reviewStats && reviewStats.totalReviews > 0 && !userReview && (
+            <motion.button
+              className="write-review-btn"
+              onClick={handleWriteReview}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <FiEdit3 /> Write a Review
+            </motion.button>
+          )}
         </div>
 
-        <div className="reviews-list">
-          {productReviews.map((review) => (
-            <motion.div
-              key={review.id}
-              className="review-card"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4 }}
-            >
-              <div className="review-header">
-                <div className="review-author">
-                  <span className="author-name">{review.author}</span>
-                  {review.verified && <span className="verified-badge">✓ Verified Purchase</span>}
+        {reviewsLoading ? (
+          <div className="reviews-loading">
+            <p>Loading reviews...</p>
+          </div>
+        ) : reviewStats && reviewStats.totalReviews > 0 ? (
+          <>
+            <div className="reviews-summary">
+              <div className="rating-overview">
+                <div className="large-rating">{reviewStats.averageRating}</div>
+                <div className="stars-large">
+                  {renderStars(reviewStats.averageRating)}
                 </div>
-                <div className="review-stars">
-                  {renderStars(review.rating)}
+                <div className="review-count-text">
+                  Based on {reviewStats.totalReviews} review{reviewStats.totalReviews !== 1 ? 's' : ''}
                 </div>
+                {reviewStats.verifiedPurchases > 0 && (
+                  <div className="verified-count">
+                    {reviewStats.verifiedPurchases} verified purchase{reviewStats.verifiedPurchases !== 1 ? 's' : ''}
+                  </div>
+                )}
               </div>
-              <div className="review-date">{review.date}</div>
-              <p className="review-comment">{review.comment}</p>
-            </motion.div>
-          ))}
-        </div>
+
+              <div className="rating-distribution">
+                {[5, 4, 3, 2, 1].map((star) => {
+                  const count = reviewStats.ratingDistribution[star]
+                  const percentage = reviewStats.totalReviews > 0
+                    ? (count / reviewStats.totalReviews) * 100
+                    : 0
+                  return (
+                    <div key={star} className="rating-bar">
+                      <span className="star-label">{star} star</span>
+                      <div className="bar-container">
+                        <div
+                          className="bar-fill"
+                          style={{ width: `${percentage}%` }}
+                        />
+                      </div>
+                      <span className="count-label">{count}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="reviews-list">
+              {productReviews.map((review) => (
+                <motion.div
+                  key={review.id}
+                  className="review-card"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4 }}
+                >
+                  <div className="review-header">
+                    <div className="review-author">
+                      <span className="author-name">
+                        {review.user_name || 'Anonymous'}
+                      </span>
+                      {review.is_verified_purchase && (
+                        <span className="verified-badge">✓ Verified Purchase</span>
+                      )}
+                    </div>
+                    <div className="review-stars">
+                      {renderStars(review.rating)}
+                    </div>
+                  </div>
+                  <div className="review-date">{formatDate(review.created_at)}</div>
+                  {review.title && <h4 className="review-title">{review.title}</h4>}
+                  {review.review_text && <p className="review-comment">{review.review_text}</p>}
+
+                  {review.images && review.images.length > 0 && (
+                    <div className="review-images">
+                      {review.images.map((image, index) => (
+                        <img
+                          key={index}
+                          src={image}
+                          alt={`Review ${index + 1}`}
+                          className="review-image"
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="review-footer">
+                    <button
+                      className="helpful-btn"
+                      onClick={() => handleMarkHelpful(review.id)}
+                    >
+                      <FiThumbsUp /> Helpful ({review.helpful_count || 0})
+                    </button>
+
+                    {/* Show Edit button only on user's own review */}
+                    {isUserOwnReview(review) && (
+                      <motion.button
+                        className="edit-review-btn"
+                        onClick={handleWriteReview}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                      >
+                        <FiEdit3 /> Edit
+                      </motion.button>
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="no-reviews">
+            <div className="no-reviews-icon">
+              <FiStar size={48} />
+            </div>
+            <h3>No reviews yet</h3>
+            <p>Be the first one to share your experience with this product!</p>
+            <motion.button
+              className="first-review-btn"
+              onClick={handleWriteReview}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <FiEdit3 /> Write the First Review
+            </motion.button>
+          </div>
+        )}
       </motion.div>
+
+      {/* Review Modal */}
+      <ReviewModal
+        isOpen={isReviewModalOpen}
+        onClose={handleReviewModalClose}
+        productId={product.id}
+        productName={product.name}
+        existingReview={userReview}
+      />
     </div>
   )
 }
