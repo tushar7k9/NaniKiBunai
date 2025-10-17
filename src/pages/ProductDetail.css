@@ -841,8 +841,24 @@
   transform: translateY(-2px);
 }
 
+.helpful-btn.voted {
+  background: linear-gradient(135deg, #d4a574 0%, #b8936e 100%);
+  border-color: #d4a574;
+  color: white;
+}
+
+.helpful-btn.voted:hover {
+  background: linear-gradient(135deg, #c59463 0%, #a7825d 100%);
+  border-color: #b8936e;
+}
+
+.helpful-btn.voted svg {
+  fill: white;
+}
+
 .helpful-btn svg {
   font-size: 1rem;
+  transition: fill 0.3s ease;
 }
 
 .edit-review-btn {

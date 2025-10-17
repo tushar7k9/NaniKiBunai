@@ -192,6 +192,7 @@ const ProductDetail = () => {
   const [userReview, setUserReview] = useState(null)
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false)
   const [reviewsLoading, setReviewsLoading] = useState(true)
+  const [votedReviews, setVotedReviews] = useState([])
 
   // Check if this product is in favorites
   const isFavorite = favorites.includes(parseInt(id))
@@ -214,6 +215,8 @@ const ProductDetail = () => {
       if (isAuthenticated) {
         fetchUserReview()
       }
+      // Load voted reviews from localStorage
+      setVotedReviews(reviewService.getVotedReviews())
     }
   }, [product, isAuthenticated])
 
@@ -264,10 +267,23 @@ const ProductDetail = () => {
 
   const handleMarkHelpful = async (reviewId) => {
     try {
-      await reviewService.markReviewHelpful(reviewId)
-      fetchReviews() // Refresh to show updated count
+      const result = await reviewService.toggleHelpfulVote(reviewId)
+
+      // Update local state immediately for better UX
+      setProductReviews((prevReviews) =>
+        prevReviews.map((review) =>
+          review.id === reviewId
+            ? { ...review, helpful_count: result.newCount }
+            : review
+        )
+      )
+
+      // Update voted reviews state
+      setVotedReviews(reviewService.getVotedReviews())
     } catch (error) {
-      console.error('Error marking review as helpful:', error)
+      console.error('Error toggling helpful vote:', error)
+      // Optionally show error message to user
+      alert('Failed to update vote. Please try again.')
     }
   }
 
@@ -592,12 +608,14 @@ const ProductDetail = () => {
                   )}
 
                   <div className="review-footer">
-                    <button
-                      className="helpful-btn"
+                    <motion.button
+                      className={`helpful-btn ${votedReviews.includes(review.id) ? 'voted' : ''}`}
                       onClick={() => handleMarkHelpful(review.id)}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
                     >
-                      <FiThumbsUp /> Helpful ({review.helpful_count || 0})
-                    </button>
+                      <FiThumbsUp /> {votedReviews.includes(review.id) ? 'Helpful' : 'Helpful'} ({review.helpful_count || 0})
+                    </motion.button>
 
                     {/* Show Edit button only on user's own review */}
                     {isUserOwnReview(review) && (

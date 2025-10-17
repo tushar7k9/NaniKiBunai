@@ -342,13 +342,61 @@ export const reviewService = {
   },
 
   /**
-   * Mark a review as helpful
-   * @param {number} reviewId - Review ID
-   * @returns {Promise<Object>} Updated review
+   * Get voted reviews from localStorage
+   * @returns {Array<number>} Array of review IDs that user has voted on
    */
-  markReviewHelpful: async (reviewId) => {
+  getVotedReviews: () => {
     try {
-      // Increment helpful_count
+      const voted = localStorage.getItem('helpful_votes')
+      return voted ? JSON.parse(voted) : []
+    } catch (error) {
+      console.error('Error getting voted reviews:', error)
+      return []
+    }
+  },
+
+  /**
+   * Check if user has voted on a review
+   * @param {number} reviewId - Review ID
+   * @returns {boolean} True if user has voted
+   */
+  hasVotedOnReview: (reviewId) => {
+    const votedReviews = reviewService.getVotedReviews()
+    return votedReviews.includes(reviewId)
+  },
+
+  /**
+   * Add review to voted list
+   * @param {number} reviewId - Review ID
+   */
+  addToVoted: (reviewId) => {
+    const votedReviews = reviewService.getVotedReviews()
+    if (!votedReviews.includes(reviewId)) {
+      votedReviews.push(reviewId)
+      localStorage.setItem('helpful_votes', JSON.stringify(votedReviews))
+    }
+  },
+
+  /**
+   * Remove review from voted list
+   * @param {number} reviewId - Review ID
+   */
+  removeFromVoted: (reviewId) => {
+    const votedReviews = reviewService.getVotedReviews()
+    const filtered = votedReviews.filter((id) => id !== reviewId)
+    localStorage.setItem('helpful_votes', JSON.stringify(filtered))
+  },
+
+  /**
+   * Toggle helpful vote on a review
+   * @param {number} reviewId - Review ID
+   * @returns {Promise<Object>} Vote result
+   */
+  toggleHelpfulVote: async (reviewId) => {
+    try {
+      const hasVoted = reviewService.hasVotedOnReview(reviewId)
+
+      // Fetch current helpful_count
       const { data: review, error: fetchError } = await supabase
         .from('reviews')
         .select('helpful_count')
@@ -360,21 +408,43 @@ export const reviewService = {
         throw fetchError
       }
 
-      const { data: updatedReview, error: updateError } = await supabase
-        .from('reviews')
-        .update({ helpful_count: (review.helpful_count || 0) + 1 })
-        .eq('id', reviewId)
-        .select()
-        .single()
+      const currentCount = review.helpful_count || 0
 
-      if (updateError) {
-        console.error('Error updating helpful count:', updateError)
-        throw updateError
+      if (hasVoted) {
+        // User already voted - remove vote (decrement count)
+        const newCount = Math.max(0, currentCount - 1)
+
+        const { error: updateError } = await supabase
+          .from('reviews')
+          .update({ helpful_count: newCount })
+          .eq('id', reviewId)
+
+        if (updateError) {
+          console.error('Error updating helpful count:', updateError)
+          throw updateError
+        }
+
+        reviewService.removeFromVoted(reviewId)
+        return { voted: false, newCount }
+      } else {
+        // User hasn't voted - add vote (increment count)
+        const newCount = currentCount + 1
+
+        const { error: updateError } = await supabase
+          .from('reviews')
+          .update({ helpful_count: newCount })
+          .eq('id', reviewId)
+
+        if (updateError) {
+          console.error('Error updating helpful count:', updateError)
+          throw updateError
+        }
+
+        reviewService.addToVoted(reviewId)
+        return { voted: true, newCount }
       }
-
-      return updatedReview
     } catch (error) {
-      console.error('Error in markReviewHelpful:', error)
+      console.error('Error in toggleHelpfulVote:', error)
       throw error
     }
   },
