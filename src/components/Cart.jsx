@@ -14,6 +14,23 @@ const Cart = ({ isOpen, onClose, cartItems, updateQuantity, removeFromCart }) =>
     return cartItems.reduce((total, item) => total + item.quantity, 0)
   }
 
+  const hasStockIssues = () => {
+    return cartItems.some(item =>
+      item.stock_quantity === 0 ||
+      (item.stock_quantity !== undefined && item.quantity > item.stock_quantity)
+    )
+  }
+
+  const handleCheckout = () => {
+    if (hasStockIssues()) {
+      alert('Please remove out-of-stock items or adjust quantities before proceeding to checkout.')
+      return
+    }
+    onClose()
+    // Pass state to indicate this is a valid checkout navigation from cart
+    navigate('/checkout', { state: { fromCart: true } })
+  }
+
   return (
     <>
       {/* Overlay */}
@@ -86,10 +103,18 @@ const Cart = ({ isOpen, onClose, cartItems, updateQuantity, removeFromCart }) =>
                 </div>
               ) : (
                 <div className="cart-items">
-                  {cartItems.map((item, index) => (
+                  {cartItems.map((item, index) => {
+                    const isOutOfStock = item.stock_quantity === 0
+                    const isLowStock = item.stock_quantity !== undefined &&
+                                       item.stock_quantity > 0 &&
+                                       item.stock_quantity <= (item.low_stock_threshold || 10)
+                    const exceedsStock = item.stock_quantity !== undefined &&
+                                        item.quantity > item.stock_quantity
+
+                    return (
                     <motion.div
                       key={`${item.id}-${index}`}
-                      className="cart-item"
+                      className={`cart-item ${isOutOfStock ? 'out-of-stock' : ''}`}
                       initial={{ opacity: 0, x: 20 }}
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: -20 }}
@@ -101,12 +126,34 @@ const Cart = ({ isOpen, onClose, cartItems, updateQuantity, removeFromCart }) =>
                           src={item.images?.[0] || item.image}
                           alt={item.name}
                         />
+                        {isOutOfStock && (
+                          <div className="cart-out-of-stock-overlay">
+                            Out of Stock
+                          </div>
+                        )}
                       </div>
 
                       {/* Item Details */}
                       <div className="cart-item-details">
                         <h4 className="cart-item-name">{item.name}</h4>
                         <p className="cart-item-price">${item.price}</p>
+
+                        {/* Stock Warnings */}
+                        {isOutOfStock && (
+                          <div className="cart-stock-warning out-of-stock">
+                            ✕ This item is no longer available
+                          </div>
+                        )}
+                        {!isOutOfStock && exceedsStock && (
+                          <div className="cart-stock-warning exceeds-stock">
+                            ⚠️ Only {item.stock_quantity} available
+                          </div>
+                        )}
+                        {!isOutOfStock && !exceedsStock && isLowStock && (
+                          <div className="cart-stock-warning low-stock">
+                            🧶 Only {item.stock_quantity} left
+                          </div>
+                        )}
 
                         {/* Color and Size - Horizontal Layout */}
                         {((item.selectedColor || item.selected_color) || (item.selectedSize || item.selected_size)) && (
@@ -136,7 +183,7 @@ const Cart = ({ isOpen, onClose, cartItems, updateQuantity, removeFromCart }) =>
                             onClick={() => updateQuantity(item.id, item.quantity - 1, item.selectedColor || item.selected_color, item.selectedSize || item.selected_size)}
                             whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.9 }}
-                            disabled={item.quantity <= 1}
+                            disabled={item.quantity <= 1 || isOutOfStock}
                           >
                             <FiMinus />
                           </motion.button>
@@ -146,6 +193,7 @@ const Cart = ({ isOpen, onClose, cartItems, updateQuantity, removeFromCart }) =>
                             onClick={() => updateQuantity(item.id, item.quantity + 1, item.selectedColor || item.selected_color, item.selectedSize || item.selected_size)}
                             whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.9 }}
+                            disabled={isOutOfStock || (item.stock_quantity !== undefined && item.quantity >= item.stock_quantity)}
                           >
                             <FiPlus />
                           </motion.button>
@@ -172,7 +220,8 @@ const Cart = ({ isOpen, onClose, cartItems, updateQuantity, removeFromCart }) =>
                         </motion.button>
                       </div>
                     </motion.div>
-                  ))}
+                  )}
+                  )}
                 </div>
               )}
             </div>
@@ -184,15 +233,18 @@ const Cart = ({ isOpen, onClose, cartItems, updateQuantity, removeFromCart }) =>
                   <span>Subtotal:</span>
                   <span className="subtotal-amount">${calculateTotal().toFixed(2)}</span>
                 </div>
+                {hasStockIssues() && (
+                  <div className="cart-checkout-warning">
+                    ⚠️ Please review stock availability before checkout
+                  </div>
+                )}
                 <p className="cart-note">Shipping & taxes calculated at checkout</p>
                 <motion.button
                   className="checkout-btn"
-                  onClick={() => {
-                    onClose()
-                    navigate('/checkout')
-                  }}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  onClick={handleCheckout}
+                  whileHover={!hasStockIssues() ? { scale: 1.02 } : {}}
+                  whileTap={!hasStockIssues() ? { scale: 0.98 } : {}}
+                  disabled={hasStockIssues()}
                 >
                   Proceed to Checkout
                 </motion.button>

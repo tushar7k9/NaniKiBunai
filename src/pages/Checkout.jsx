@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FiArrowLeft, FiCreditCard, FiTruck, FiShoppingBag, FiLock, FiMessageSquare, FiX } from 'react-icons/fi'
 import { useCart } from '../hooks/useCart'
@@ -9,8 +9,18 @@ import './Checkout.css'
 
 const Checkout = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   const { cart, getTotalPrice, clearCart } = useCart()
   const { user, isAuthenticated } = useAuth()
+
+  // Check if user came from cart
+  useEffect(() => {
+    if (!location.state?.fromCart) {
+      // User didn't come from cart - redirect them
+      alert('Please proceed to checkout through your shopping cart.')
+      navigate('/products')
+    }
+  }, [location, navigate])
 
   // Form state
   const [shippingInfo, setShippingInfo] = useState({
@@ -135,6 +145,19 @@ const Checkout = () => {
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault()
+
+    // Final stock validation before processing order
+    const hasStockIssues = cart.some(item =>
+      item.stock_quantity === 0 ||
+      (item.stock_quantity !== undefined && item.quantity > item.stock_quantity)
+    )
+
+    if (hasStockIssues) {
+      setOrderError('Some items in your cart have stock issues. Please review your cart before proceeding.')
+      alert('Some items in your cart are out of stock or exceed available quantity. Please return to your cart to resolve these issues.')
+      return
+    }
+
     setIsProcessing(true)
     setOrderError(null)
 

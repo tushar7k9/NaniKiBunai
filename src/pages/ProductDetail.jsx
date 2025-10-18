@@ -434,6 +434,26 @@ const ProductDetail = () => {
 
           <div className="product-price-large">${product.price}</div>
 
+          {/* Low Stock Warning */}
+          {product.stock_quantity !== undefined &&
+           product.stock_quantity <= (product.low_stock_threshold || 10) &&
+           product.stock_quantity > 0 && (
+            <div className="low-stock-warning">
+              <span className="warning-icon">🧶</span>
+              <div className="warning-content">
+                <p>Only {product.stock_quantity} {product.stock_quantity === 1 ? 'left' : 'left'} in stock</p>
+              </div>
+            </div>
+          )}
+          {product.stock_quantity === 0 && (
+            <div className="out-of-stock-warning">
+              <span className="warning-icon">✕</span>
+              <div className="warning-content">
+                <p>Currently unavailable</p>
+              </div>
+            </div>
+          )}
+
           <p className="product-description-full">{product.fullDescription}</p>
 
           {/* Color Selection */}
@@ -494,10 +514,11 @@ const ProductDetail = () => {
           <motion.button
             className="add-to-cart-btn-detail"
             onClick={handleAddToCart}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={product.stock_quantity !== 0 ? { scale: 1.02 } : {}}
+            whileTap={product.stock_quantity !== 0 ? { scale: 0.98 } : {}}
+            disabled={product.stock_quantity === 0}
           >
-            <FiShoppingCart /> Add to Cart - ${product.price}
+            <FiShoppingCart /> {product.stock_quantity === 0 ? 'Out of Stock' : `Add to Cart - $${product.price}`}
           </motion.button>
         </motion.div>
       </div>
