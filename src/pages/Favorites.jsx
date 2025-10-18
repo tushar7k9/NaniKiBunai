@@ -236,7 +236,7 @@ const FavoriteCard = ({ product, addToCart, toggleFavorite, cartItem }) => {
       transition={{ duration: 0.4 }}
       whileHover={{ y: -10 }}
       onClick={handleCardClick}
-      style={{ cursor: 'pointer' }}
+      style={{ cursor: "pointer" }}
     >
       {/* Remove from Favorites button */}
       <motion.button
@@ -271,10 +271,12 @@ const FavoriteCard = ({ product, addToCart, toggleFavorite, cartItem }) => {
               {product.images.map((_, index) => (
                 <span
                   key={index}
-                  className={`indicator ${index === currentImageIndex ? 'active' : ''}`}
+                  className={`indicator ${
+                    index === currentImageIndex ? "active" : ""
+                  }`}
                   onClick={(e) => {
-                    e.stopPropagation()
-                    setCurrentImageIndex(index)
+                    e.stopPropagation();
+                    setCurrentImageIndex(index);
                   }}
                 />
               ))}
@@ -301,7 +303,7 @@ const FavoriteCard = ({ product, addToCart, toggleFavorite, cartItem }) => {
         </div>
 
         <div className="favorite-meta">
-          <span className="difficulty-badge">{product.difficulty}</span>
+          <span className="category-badge">{product.category}</span>
         </div>
 
         <div className="favorite-footer">
@@ -318,7 +320,10 @@ const FavoriteCard = ({ product, addToCart, toggleFavorite, cartItem }) => {
               <FiShoppingCart /> Add to Cart
             </motion.button>
           ) : (
-            <div className="quantity-selector-fav" onClick={(e) => e.stopPropagation()}>
+            <div
+              className="quantity-selector-fav"
+              onClick={(e) => e.stopPropagation()}
+            >
               <motion.button
                 className="quantity-btn"
                 onClick={decrementQuantity}
@@ -341,7 +346,7 @@ const FavoriteCard = ({ product, addToCart, toggleFavorite, cartItem }) => {
         </div>
       </div>
     </motion.div>
-  )
+  );
 }
 
 const Favorites = () => {

@@ -328,7 +328,7 @@
   border-bottom: none;
 }
 
-.difficulty-badge-detail {
+.category-badge-detail {
   display: inline-block;
   padding: 0.3rem 0.8rem;
   background: linear-gradient(135deg, #ffd7a8 0%, #ffcb8e 100%);

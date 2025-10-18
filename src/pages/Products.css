@@ -474,7 +474,7 @@
   text-align: center;
 }
 
-.difficulty-badge {
+.category-badge {
   display: inline-block;
   padding: 0.4rem 1rem;
   background: linear-gradient(135deg, #ffd7a8 0%, #ffcb8e 100%);

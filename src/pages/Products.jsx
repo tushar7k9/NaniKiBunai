@@ -240,14 +240,14 @@ const ProductCard = ({ product, addToCart, isFavorite, toggleFavorite }) => {
       transition={{ duration: 0.4 }}
       whileHover={{ y: -10 }}
       onClick={handleCardClick}
-      style={{ cursor: 'pointer' }}
+      style={{ cursor: "pointer" }}
     >
       {/* Favorite button */}
       <motion.button
-        className={`favorite-btn ${isFavorite ? 'active' : ''}`}
+        className={`favorite-btn ${isFavorite ? "active" : ""}`}
         onClick={(e) => {
-          e.stopPropagation()
-          toggleFavorite(product.id)
+          e.stopPropagation();
+          toggleFavorite(product.id);
         }}
         whileHover={{ scale: 1.2 }}
         whileTap={{ scale: 0.9 }}
@@ -278,10 +278,12 @@ const ProductCard = ({ product, addToCart, isFavorite, toggleFavorite }) => {
               {product.images.map((_, index) => (
                 <span
                   key={index}
-                  className={`indicator ${index === currentImageIndex ? 'active' : ''}`}
+                  className={`indicator ${
+                    index === currentImageIndex ? "active" : ""
+                  }`}
                   onClick={(e) => {
-                    e.stopPropagation()
-                    setCurrentImageIndex(index)
+                    e.stopPropagation();
+                    setCurrentImageIndex(index);
                   }}
                 />
               ))}
@@ -297,16 +299,14 @@ const ProductCard = ({ product, addToCart, isFavorite, toggleFavorite }) => {
 
         {/* Low Stock Badge */}
         {product.stock_quantity !== undefined &&
-         product.stock_quantity <= (product.low_stock_threshold || 10) &&
-         product.stock_quantity > 0 && (
-          <div className="low-stock-badge">
-            Only {product.stock_quantity} left in stock!
-          </div>
-        )}
+          product.stock_quantity <= (product.low_stock_threshold || 10) &&
+          product.stock_quantity > 0 && (
+            <div className="low-stock-badge">
+              Only {product.stock_quantity} left in stock!
+            </div>
+          )}
         {product.stock_quantity === 0 && (
-          <div className="out-of-stock-badge">
-            Out of Stock
-          </div>
+          <div className="out-of-stock-badge">Out of Stock</div>
         )}
 
         {/* Color palette - Interactive selection */}
@@ -314,11 +314,11 @@ const ProductCard = ({ product, addToCart, isFavorite, toggleFavorite }) => {
           {product.colors.map((color, i) => (
             <motion.span
               key={i}
-              className={`color-dot ${i === selectedColor ? 'selected' : ''}`}
+              className={`color-dot ${i === selectedColor ? "selected" : ""}`}
               style={{ backgroundColor: color }}
               onClick={(e) => {
-                e.stopPropagation()
-                setSelectedColor(i)
+                e.stopPropagation();
+                setSelectedColor(i);
               }}
               whileHover={{ scale: 1.3 }}
               whileTap={{ scale: 0.9 }}
@@ -333,10 +333,12 @@ const ProductCard = ({ product, addToCart, isFavorite, toggleFavorite }) => {
             {product.sizes.map((size) => (
               <motion.button
                 key={size}
-                className={`size-option ${selectedSize === size ? 'selected' : ''}`}
+                className={`size-option ${
+                  selectedSize === size ? "selected" : ""
+                }`}
                 onClick={(e) => {
-                  e.stopPropagation()
-                  setSelectedSize(size)
+                  e.stopPropagation();
+                  setSelectedSize(size);
                 }}
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.95 }}
@@ -348,7 +350,7 @@ const ProductCard = ({ product, addToCart, isFavorite, toggleFavorite }) => {
         )}
 
         <div className="product-meta">
-          <span className="difficulty-badge">{product.difficulty}</span>
+          <span className="category-badge">{product.category}</span>
         </div>
 
         <div className="product-footer">
@@ -362,12 +364,13 @@ const ProductCard = ({ product, addToCart, isFavorite, toggleFavorite }) => {
             whileTap={product.stock_quantity !== 0 ? { scale: 0.95 } : {}}
             disabled={product.stock_quantity === 0}
           >
-            <FiShoppingCart /> {product.stock_quantity === 0 ? 'Out of Stock' : 'Add to Cart'}
+            <FiShoppingCart />{" "}
+            {product.stock_quantity === 0 ? "Out of Stock" : "Add to Cart"}
           </motion.button>
         </div>
       </div>
     </motion.div>
-  )
+  );
 }
 
 const Products = () => {

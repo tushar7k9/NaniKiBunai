@@ -347,7 +347,7 @@ const ProductDetail = () => {
       {/* Back Button */}
       <motion.button
         className="back-button"
-        onClick={() => navigate('/products')}
+        onClick={() => navigate("/products")}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         initial={{ opacity: 0, x: -20 }}
@@ -385,7 +385,7 @@ const ProductDetail = () => {
 
             {/* Favorite Button */}
             <motion.button
-              className={`favorite-btn-detail ${isFavorite ? 'active' : ''}`}
+              className={`favorite-btn-detail ${isFavorite ? "active" : ""}`}
               onClick={() => toggleFavorite(parseInt(id))}
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
@@ -399,7 +399,9 @@ const ProductDetail = () => {
             {product.images.map((img, index) => (
               <motion.div
                 key={index}
-                className={`thumbnail ${index === currentImageIndex ? 'active' : ''}`}
+                className={`thumbnail ${
+                  index === currentImageIndex ? "active" : ""
+                }`}
                 onClick={() => setCurrentImageIndex(index)}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -425,8 +427,13 @@ const ProductDetail = () => {
                   {renderStars(reviewStats.averageRating)}
                 </div>
                 <span className="rating-text">
-                  {reviewStats.averageRating > 0 ? reviewStats.averageRating : 'No rating yet'}
-                  {reviewStats.totalReviews > 0 && ` (${reviewStats.totalReviews} ${reviewStats.totalReviews === 1 ? 'review' : 'reviews'})`}
+                  {reviewStats.averageRating > 0
+                    ? reviewStats.averageRating
+                    : "No rating yet"}
+                  {reviewStats.totalReviews > 0 &&
+                    ` (${reviewStats.totalReviews} ${
+                      reviewStats.totalReviews === 1 ? "review" : "reviews"
+                    })`}
                 </span>
               </div>
             )}
@@ -436,15 +443,18 @@ const ProductDetail = () => {
 
           {/* Low Stock Warning */}
           {product.stock_quantity !== undefined &&
-           product.stock_quantity <= (product.low_stock_threshold || 10) &&
-           product.stock_quantity > 0 && (
-            <div className="low-stock-warning">
-              <span className="warning-icon">🧶</span>
-              <div className="warning-content">
-                <p>Only {product.stock_quantity} {product.stock_quantity === 1 ? 'left' : 'left'} in stock</p>
+            product.stock_quantity <= (product.low_stock_threshold || 10) &&
+            product.stock_quantity > 0 && (
+              <div className="low-stock-warning">
+                <span className="warning-icon">🧶</span>
+                <div className="warning-content">
+                  <p>
+                    Only {product.stock_quantity}{" "}
+                    {product.stock_quantity === 1 ? "left" : "left"} in stock
+                  </p>
+                </div>
               </div>
-            </div>
-          )}
+            )}
           {product.stock_quantity === 0 && (
             <div className="out-of-stock-warning">
               <span className="warning-icon">✕</span>
@@ -463,7 +473,9 @@ const ProductDetail = () => {
               {product.colors.map((color, index) => (
                 <motion.div
                   key={index}
-                  className={`color-option ${index === selectedColor ? 'selected' : ''}`}
+                  className={`color-option ${
+                    index === selectedColor ? "selected" : ""
+                  }`}
                   style={{ backgroundColor: color }}
                   onClick={() => setSelectedColor(index)}
                   whileHover={{ scale: 1.2 }}
@@ -481,7 +493,9 @@ const ProductDetail = () => {
                 {product.sizes.map((size) => (
                   <motion.button
                     key={size}
-                    className={`size-option-detail ${selectedSize === size ? 'selected' : ''}`}
+                    className={`size-option-detail ${
+                      selectedSize === size ? "selected" : ""
+                    }`}
                     onClick={() => setSelectedSize(size)}
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.95 }}
@@ -497,10 +511,21 @@ const ProductDetail = () => {
           <div className="product-specs">
             <h3>Product Details:</h3>
             <ul>
-              <li><strong>Materials:</strong> {product.materials.join(', ')}</li>
-              <li><strong>Dimensions:</strong> {product.dimensions}</li>
-              <li><strong>Weight:</strong> {product.weight}</li>
-              <li><strong>Difficulty:</strong> <span className="difficulty-badge-detail">{product.difficulty}</span></li>
+              <li>
+                <strong>Materials:</strong> {product.materials.join(", ")}
+              </li>
+              <li>
+                <strong>Dimensions:</strong> {product.dimensions}
+              </li>
+              <li>
+                <strong>Weight:</strong> {product.weight}
+              </li>
+              <li>
+                <strong>Category:</strong>{" "}
+                <span className="category-badge-detail">
+                  {product.difficulty}
+                </span>
+              </li>
             </ul>
           </div>
 
@@ -518,7 +543,10 @@ const ProductDetail = () => {
             whileTap={product.stock_quantity !== 0 ? { scale: 0.98 } : {}}
             disabled={product.stock_quantity === 0}
           >
-            <FiShoppingCart /> {product.stock_quantity === 0 ? 'Out of Stock' : `Add to Cart - $${product.price}`}
+            <FiShoppingCart />{" "}
+            {product.stock_quantity === 0
+              ? "Out of Stock"
+              : `Add to Cart - $${product.price}`}
           </motion.button>
         </motion.div>
       </div>
@@ -558,21 +586,24 @@ const ProductDetail = () => {
                   {renderStars(reviewStats.averageRating)}
                 </div>
                 <div className="review-count-text">
-                  Based on {reviewStats.totalReviews} review{reviewStats.totalReviews !== 1 ? 's' : ''}
+                  Based on {reviewStats.totalReviews} review
+                  {reviewStats.totalReviews !== 1 ? "s" : ""}
                 </div>
                 {reviewStats.verifiedPurchases > 0 && (
                   <div className="verified-count">
-                    {reviewStats.verifiedPurchases} verified purchase{reviewStats.verifiedPurchases !== 1 ? 's' : ''}
+                    {reviewStats.verifiedPurchases} verified purchase
+                    {reviewStats.verifiedPurchases !== 1 ? "s" : ""}
                   </div>
                 )}
               </div>
 
               <div className="rating-distribution">
                 {[5, 4, 3, 2, 1].map((star) => {
-                  const count = reviewStats.ratingDistribution[star]
-                  const percentage = reviewStats.totalReviews > 0
-                    ? (count / reviewStats.totalReviews) * 100
-                    : 0
+                  const count = reviewStats.ratingDistribution[star];
+                  const percentage =
+                    reviewStats.totalReviews > 0
+                      ? (count / reviewStats.totalReviews) * 100
+                      : 0;
                   return (
                     <div key={star} className="rating-bar">
                       <span className="star-label">{star} star</span>
@@ -584,7 +615,7 @@ const ProductDetail = () => {
                       </div>
                       <span className="count-label">{count}</span>
                     </div>
-                  )
+                  );
                 })}
               </div>
             </div>
@@ -601,19 +632,27 @@ const ProductDetail = () => {
                   <div className="review-header">
                     <div className="review-author">
                       <span className="author-name">
-                        {review.user_name || 'Anonymous'}
+                        {review.user_name || "Anonymous"}
                       </span>
                       {review.is_verified_purchase && (
-                        <span className="verified-badge">✓ Verified Purchase</span>
+                        <span className="verified-badge">
+                          ✓ Verified Purchase
+                        </span>
                       )}
                     </div>
                     <div className="review-stars">
                       {renderStars(review.rating)}
                     </div>
                   </div>
-                  <div className="review-date">{formatDate(review.created_at)}</div>
-                  {review.title && <h4 className="review-title">{review.title}</h4>}
-                  {review.review_text && <p className="review-comment">{review.review_text}</p>}
+                  <div className="review-date">
+                    {formatDate(review.created_at)}
+                  </div>
+                  {review.title && (
+                    <h4 className="review-title">{review.title}</h4>
+                  )}
+                  {review.review_text && (
+                    <p className="review-comment">{review.review_text}</p>
+                  )}
 
                   {review.images && review.images.length > 0 && (
                     <div className="review-images">
@@ -630,12 +669,16 @@ const ProductDetail = () => {
 
                   <div className="review-footer">
                     <motion.button
-                      className={`helpful-btn ${votedReviews.includes(review.id) ? 'voted' : ''}`}
+                      className={`helpful-btn ${
+                        votedReviews.includes(review.id) ? "voted" : ""
+                      }`}
                       onClick={() => handleMarkHelpful(review.id)}
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                     >
-                      <FiThumbsUp /> {votedReviews.includes(review.id) ? 'Helpful' : 'Helpful'} ({review.helpful_count || 0})
+                      <FiThumbsUp />{" "}
+                      {votedReviews.includes(review.id) ? "Helpful" : "Helpful"}{" "}
+                      ({review.helpful_count || 0})
                     </motion.button>
 
                     {/* Show Edit button only on user's own review */}
@@ -682,7 +725,7 @@ const ProductDetail = () => {
         existingReview={userReview}
       />
     </div>
-  )
+  );
 }
 
 export default ProductDetail
