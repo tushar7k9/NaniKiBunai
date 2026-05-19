@@ -512,7 +512,7 @@ const ProductDetail = () => {
             <h3>Product Details:</h3>
             <ul>
               <li>
-                <strong>Materials:</strong> {product.materials.join(", ")}
+                <strong>Materials:</strong> {(product.materials || []).join(", ") || "N/A"}
               </li>
               <li>
                 <strong>Dimensions:</strong> {product.dimensions}
