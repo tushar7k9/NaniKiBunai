@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { FiShoppingCart, FiMenu, FiX, FiSearch, FiHeart, FiUser, FiLogOut, FiPackage } from 'react-icons/fi'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import './Header.css'
 
-const Header = ({ cartCount, favoritesCount, onCartClick, onFavoritesClick }) => {
+const Header = ({ cartCount, favoritesCount, onCartClick, onFavoritesClick, cartIconRef, onSearchClick }) => {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user, signOut, isAuthenticated } = useAuth()
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -56,26 +57,35 @@ const Header = ({ cartCount, favoritesCount, onCartClick, onFavoritesClick }) =>
       transition={{ duration: 0.6 }}
     >
       <div className="header-container">
-        <div className="header-logo">
+        <div className="header-logo" onClick={() => navigate('/')}>
           <motion.h1
-            whileHover={{ scale: 1.05 }}
+            whileHover={{ scale: 1.03 }}
             transition={{ duration: 0.2 }}
           >
-            Nani ki Bunai
+            <motion.span
+              className="logo-yarn"
+              whileHover={{ rotate: 20 }}
+              transition={{ duration: 0.3 }}
+            >🧶</motion.span>
+            {' '}Nani <em>ki</em> Bunai
           </motion.h1>
         </div>
 
+        {isMobileMenuOpen && (
+          <div className="mobile-overlay" onClick={() => setIsMobileMenuOpen(false)} />
+        )}
+
         <nav className={`header-nav ${isMobileMenuOpen ? 'open' : ''}`}>
-          <a href="/">Home</a>
-          {/* <a href="/collections">Collections</a> */}
-          <a href="/products">Products</a>
-          <a href="/our-story">Our Story</a>
-          <a href="/contact">Contact</a>
+          <Link to="/" className={location.pathname === '/' ? 'active' : ''} onClick={() => setIsMobileMenuOpen(false)}>Home</Link>
+          <Link to="/products" className={location.pathname === '/products' ? 'active' : ''} onClick={() => setIsMobileMenuOpen(false)}>Products</Link>
+          {/* <Link to="/our-story" className={location.pathname === '/our-story' ? 'active' : ''} onClick={() => setIsMobileMenuOpen(false)}>Our Story</Link> */}
+          <Link to="/contact" className={location.pathname === '/contact' ? 'active' : ''} onClick={() => setIsMobileMenuOpen(false)}>Contact</Link>
         </nav>
 
         <div className="header-actions">
           <motion.button
             className="icon-btn"
+            onClick={onSearchClick}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
           >
@@ -84,7 +94,7 @@ const Header = ({ cartCount, favoritesCount, onCartClick, onFavoritesClick }) =>
 
           <motion.button
             className="icon-btn favorites-btn"
-            onClick={() => window.location.href = '/favorites'}
+            onClick={() => navigate('/favorites')}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
           >
@@ -102,6 +112,7 @@ const Header = ({ cartCount, favoritesCount, onCartClick, onFavoritesClick }) =>
           </motion.button>
 
           <motion.button
+            ref={cartIconRef}
             className="icon-btn cart-btn"
             onClick={onCartClick}
             whileHover={{ scale: 1.1 }}

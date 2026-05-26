@@ -1,190 +1,214 @@
-import React, { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { FiHeart, FiShoppingCart, FiChevronLeft, FiChevronRight, FiStar, FiArrowLeft, FiEdit3, FiThumbsUp } from 'react-icons/fi'
+import React, { useState, useEffect, useRef } from 'react'
+import { useParams, useNavigate, Link } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
+import { FiHeart, FiShoppingBag, FiChevronLeft, FiChevronRight, FiStar, FiEdit3, FiThumbsUp, FiTruck, FiShield, FiRefreshCw, FiX, FiMaximize2 } from 'react-icons/fi'
 import { useProducts } from '../hooks/useProducts'
 import { useCart } from '../hooks/useCart'
 import { useFavorites } from '../hooks/useFavorites'
 import { useAuth } from '../hooks/useAuth'
 import { reviewService } from '../services/reviewService'
 import ReviewModal from '../components/ReviewModal'
+import { useFlyToCart } from '../components/FlyToCart'
 import './ProductDetail.css'
 
-// Static product data with additional details for fallback
-const STATIC_PRODUCTS_DETAIL = [
-  {
-    id: 1,
-    name: 'Cozy Winter Scarf',
-    category: 'scarves',
-    price: 45,
-    images: [
-      'https://images.unsplash.com/photo-1520903920243-00d872a2d1c9?w=800',
-      'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=800',
-      'https://images.unsplash.com/photo-1606400082777-ef05f3c5cde7?w=800'
-    ],
-    description: 'Handmade with love and extra warmth. Perfect for chilly winter days.',
-    fullDescription: 'This beautiful cozy winter scarf is handcrafted with premium quality yarn, ensuring maximum warmth and comfort during the coldest months. Each stitch is made with care and attention to detail, creating a unique piece that will keep you warm and stylish. The soft texture feels gentle against your skin while providing excellent insulation.',
-    colors: ['#FFB6C1', '#E6E6FA', '#FFE4B5'],
-    difficulty: 'beginner',
-    materials: ['100% Merino Wool', 'Hypoallergenic', 'Machine Washable'],
-    dimensions: '70" x 8"',
-    weight: '150g',
-    careInstructions: 'Hand wash in cold water or machine wash on gentle cycle. Lay flat to dry.',
-    rating: 4.8,
-    reviewCount: 24
+/* ─── Size Chart Data ─── */
+const sizeChartData = {
+  scarves: {
+    label: 'Scarves',
+    headers: ['Size', 'Length', 'Width'],
+    rows: [
+      ['S', '60"', '6"'],
+      ['M', '70"', '8"'],
+      ['L', '80"', '10"'],
+      ['XL', '90"', '12"'],
+      ['XXL', '100"', '14"'],
+    ]
   },
-  {
-    id: 2,
-    name: 'Classic Cardigan',
-    category: 'sweaters',
-    price: 120,
-    images: [
-      'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=800',
-      'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=800',
-      'https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?w=800'
-    ],
-    description: 'Nani\'s signature design, passed down generations. A timeless classic.',
-    fullDescription: 'A timeless piece that has been passed down through generations, this classic cardigan represents the pinnacle of traditional knitting craftsmanship. Made with love and expertise, it features intricate patterns and superior construction that will last for years to come.',
-    colors: ['#DEB887', '#F5DEB3', '#D2691E'],
-    difficulty: 'advanced',
-    materials: ['80% Cotton', '20% Cashmere', 'Premium Quality'],
-    dimensions: 'Available in S, M, L, XL',
-    weight: '450g',
-    careInstructions: 'Dry clean only or hand wash with care.',
-    rating: 4.9,
-    reviewCount: 42
+  sweaters: {
+    label: 'Sweaters & Cardigans',
+    headers: ['Size', 'Chest', 'Length', 'Sleeve'],
+    rows: [
+      ['S', '34-36"', '25"', '32"'],
+      ['M', '38-40"', '26"', '33"'],
+      ['L', '42-44"', '27"', '34"'],
+      ['XL', '46-48"', '28"', '35"'],
+      ['XXL', '50-52"', '29"', '36"'],
+    ]
   },
-  {
-    id: 3,
-    name: 'Chunky Beanie',
-    category: 'hats',
-    price: 35,
-    images: [
-      'https://images.unsplash.com/photo-1576871337622-98d48d1cf531?w=800',
-      'https://images.unsplash.com/photo-1533642310407-f985136ea0b1?w=800',
-      'https://images.unsplash.com/photo-1521369909029-2afed882baee?w=800'
-    ],
-    description: 'Perfect for cold mornings and warm hearts. Keeps you cozy all day.',
-    fullDescription: 'This chunky beanie is your perfect companion for cold winter mornings. Featuring a thick, comfortable knit that provides excellent insulation, it keeps your head warm while looking stylish. The soft interior lining adds extra comfort.',
-    colors: ['#B0E0E6', '#F0E68C', '#DDA0DD'],
-    difficulty: 'beginner',
-    materials: ['100% Acrylic', 'Soft Inner Lining', 'One Size Fits All'],
-    dimensions: 'One Size (Stretchy)',
-    weight: '80g',
-    careInstructions: 'Machine wash cold, tumble dry low.',
-    rating: 4.7,
-    reviewCount: 18
+  hats: {
+    label: 'Hats & Beanies',
+    headers: ['Size', 'Head Circumference'],
+    rows: [
+      ['S', '20-21"'],
+      ['M', '21.5-22.5"'],
+      ['L', '23-24"'],
+      ['XL', '24.5-25.5"'],
+      ['XXL', '26-27"'],
+    ]
   },
-  {
-    id: 4,
-    name: 'Wool Mittens Pair',
-    category: 'gloves',
-    price: 40,
-    images: [
-      'https://images.unsplash.com/photo-1606400082777-ef05f3c5cde7?w=800',
-      'https://images.unsplash.com/photo-1544923408-75c5cef46f14?w=800',
-      'https://images.unsplash.com/photo-1610979402004-dbf5eca5cbbf?w=800'
-    ],
-    description: 'Connected with string so you never lose them. Made from premium wool.',
-    fullDescription: 'These adorable wool mittens come connected with a string, ensuring you never lose one. Made from premium quality wool, they provide excellent warmth and comfort. Perfect for both adults and children.',
-    colors: ['#FF6347', '#98FB98', '#87CEEB'],
-    difficulty: 'intermediate',
-    materials: ['100% Wool', 'Fleece Lined', 'Adjustable String'],
-    dimensions: 'Adult Size',
-    weight: '100g',
-    careInstructions: 'Hand wash only, air dry.',
-    rating: 4.6,
-    reviewCount: 15
+  gloves: {
+    label: 'Gloves & Mittens',
+    headers: ['Size', 'Palm Width', 'Length'],
+    rows: [
+      ['S', '3"', '7"'],
+      ['M', '3.5"', '7.5"'],
+      ['L', '4"', '8"'],
+      ['XL', '4.5"', '8.5"'],
+      ['XXL', '5"', '9"'],
+    ]
   },
-  {
-    id: 5,
-    name: 'Granny Square Blanket',
-    category: 'blankets',
-    price: 180,
-    images: [
-      'https://images.unsplash.com/photo-1584100936595-c0654b55a2e2?w=800',
-      'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800',
-      'https://images.unsplash.com/photo-1631889993959-41b4e9c6e3c5?w=800'
-    ],
-    description: 'The coziest hug you\'ll ever receive. Hand-stitched with care.',
-    fullDescription: 'This beautiful granny square blanket is a labor of love, featuring hundreds of individually crafted squares sewn together to create a warm, cozy masterpiece. Each square is carefully made and joined, resulting in a stunning heirloom-quality blanket.',
-    colors: ['#FFB6C1', '#DDA0DD', '#F0E68C', '#98FB98'],
-    difficulty: 'advanced',
-    materials: ['Premium Acrylic Yarn', 'Hypoallergenic', 'Colorfast'],
-    dimensions: '60" x 80"',
-    weight: '1.2kg',
-    careInstructions: 'Machine wash gentle, tumble dry low.',
-    rating: 5.0,
-    reviewCount: 56
+  blankets: {
+    label: 'Blankets',
+    headers: ['Size', 'Dimensions'],
+    rows: [
+      ['S', '40" x 50"'],
+      ['M', '50" x 60"'],
+      ['L', '60" x 80"'],
+      ['XL', '70" x 90"'],
+      ['XXL', '80" x 100"'],
+    ]
   },
-  {
-    id: 6,
-    name: 'Tea Cozy Set',
-    category: 'accessories',
-    price: 28,
-    images: [
-      'https://images.unsplash.com/photo-1564890369478-c89ca6d9cde9?w=800',
-      'https://images.unsplash.com/photo-1556911220-bff31c812dba?w=800',
-      'https://images.unsplash.com/photo-1588195538326-c5b1e5b43ce5?w=800'
-    ],
-    description: 'Keep your tea warm while you knit. Comes with matching coasters.',
-    fullDescription: 'This charming tea cozy set includes a beautifully knitted tea cozy and four matching coasters. Perfect for tea lovers, it keeps your teapot warm for longer while adding a touch of handmade charm to your tea time.',
-    colors: ['#FFE4B5', '#DEB887', '#F5DEB3'],
-    difficulty: 'beginner',
-    materials: ['Cotton Blend', 'Heat Resistant', 'Set of 5 pieces'],
-    dimensions: 'Fits standard teapots',
-    weight: '120g',
-    careInstructions: 'Machine washable, air dry.',
-    rating: 4.5,
-    reviewCount: 12
-  }
-]
+  socks: {
+    label: 'Socks',
+    headers: ['Size', 'Foot Length', 'US Shoe'],
+    rows: [
+      ['S', '8.5-9"', '5-7'],
+      ['M', '9.5-10"', '7.5-9'],
+      ['L', '10.5-11"', '9.5-11'],
+      ['XL', '11.5-12"', '11.5-13'],
+      ['XXL', '12.5-13"', '13.5-15'],
+    ]
+  },
+  baby: {
+    label: 'Baby Items',
+    headers: ['Size', 'Age Range', 'Weight'],
+    rows: [
+      ['S', '0-3 months', 'Up to 12 lbs'],
+      ['M', '3-6 months', '12-17 lbs'],
+      ['L', '6-12 months', '17-22 lbs'],
+      ['XL', '12-18 months', '22-28 lbs'],
+      ['XXL', '18-24 months', '28-33 lbs'],
+    ]
+  },
+  accessories: {
+    label: 'Accessories',
+    headers: ['Size', 'Dimensions'],
+    rows: [
+      ['S', 'Small / Compact'],
+      ['M', 'Medium / Standard'],
+      ['L', 'Large / Oversized'],
+      ['XL', 'Extra Large'],
+      ['XXL', 'XXL'],
+    ]
+  },
+}
 
-const reviews = {
-  1: [
-    { id: 1, author: 'Sarah M.', rating: 5, date: '2025-01-15', comment: 'Absolutely love this scarf! So soft and warm. Perfect for winter walks.', verified: true },
-    { id: 2, author: 'Michael T.', rating: 5, date: '2025-01-10', comment: 'Great quality and beautiful colors. Exactly as described!', verified: true },
-    { id: 3, author: 'Emily R.', rating: 4, date: '2025-01-05', comment: 'Very nice scarf, though a bit longer than I expected. Still love it!', verified: false },
-    { id: 4, author: 'David L.', rating: 5, date: '2024-12-28', comment: 'Bought as a gift and my sister absolutely loves it. Will order more!', verified: true }
+/* ─── Custom Measurement Fields by Category ─── */
+const customMeasurementFields = {
+  scarves: [
+    { key: 'length', label: 'Desired Length', unit: 'inches', placeholder: '70' },
+    { key: 'width', label: 'Desired Width', unit: 'inches', placeholder: '8' },
   ],
-  2: [
-    { id: 1, author: 'Jennifer K.', rating: 5, date: '2025-01-18', comment: 'This cardigan is a work of art! The quality is exceptional.', verified: true },
-    { id: 2, author: 'Robert P.', rating: 5, date: '2025-01-12', comment: 'Worth every penny. Fits perfectly and looks amazing.', verified: true },
-    { id: 3, author: 'Lisa M.', rating: 4, date: '2025-01-08', comment: 'Beautiful cardigan, runs slightly large but very comfortable.', verified: true }
+  sweaters: [
+    { key: 'chest', label: 'Chest', unit: 'inches', placeholder: '40' },
+    { key: 'length', label: 'Length', unit: 'inches', placeholder: '26' },
+    { key: 'sleeve', label: 'Sleeve', unit: 'inches', placeholder: '33' },
   ],
-  3: [
-    { id: 1, author: 'Amanda S.', rating: 5, date: '2025-01-14', comment: 'Perfect beanie for cold days! Love the chunky knit.', verified: true },
-    { id: 2, author: 'Chris B.', rating: 4, date: '2025-01-09', comment: 'Great quality, keeps my head warm. Could be a bit stretchier.', verified: false }
+  hats: [
+    { key: 'circumference', label: 'Head Circumference', unit: 'inches', placeholder: '22' },
   ],
-  4: [
-    { id: 1, author: 'Karen W.', rating: 5, date: '2025-01-16', comment: 'These mittens are adorable and so warm! Love the connecting string.', verified: true },
-    { id: 2, author: 'Tom H.', rating: 4, date: '2025-01-11', comment: 'Good quality mittens, perfect for my kids.', verified: true }
+  gloves: [
+    { key: 'palmWidth', label: 'Palm Width', unit: 'inches', placeholder: '3.5' },
+    { key: 'handLength', label: 'Hand Length', unit: 'inches', placeholder: '7.5' },
   ],
-  5: [
-    { id: 1, author: 'Rachel G.', rating: 5, date: '2025-01-17', comment: 'This blanket is absolutely gorgeous! Worth the investment.', verified: true },
-    { id: 2, author: 'James D.', rating: 5, date: '2025-01-13', comment: 'Beautiful craftsmanship. This will be a family heirloom.', verified: true },
-    { id: 3, author: 'Michelle L.', rating: 5, date: '2025-01-07', comment: 'Perfect size and so cozy! Love all the colors.', verified: true }
+  blankets: [
+    { key: 'width', label: 'Width', unit: 'inches', placeholder: '60' },
+    { key: 'height', label: 'Height', unit: 'inches', placeholder: '80' },
   ],
-  6: [
-    { id: 1, author: 'Susan P.', rating: 4, date: '2025-01-15', comment: 'Cute tea cozy set! Works well and looks lovely.', verified: true },
-    { id: 2, author: 'Peter M.', rating: 5, date: '2025-01-10', comment: 'Great gift for tea lovers. Very well made.', verified: false }
-  ]
+  socks: [
+    { key: 'footLength', label: 'Foot Length', unit: 'inches', placeholder: '10' },
+    { key: 'shoeSize', label: 'Shoe Size (US)', unit: '', placeholder: '9' },
+  ],
+  baby: [
+    { key: 'ageMonths', label: 'Age', unit: 'months', placeholder: '6' },
+    { key: 'weight', label: 'Weight', unit: 'lbs', placeholder: '17' },
+  ],
+  accessories: [
+    { key: 'notes', label: 'Size Notes', unit: '', placeholder: 'Describe your preferred size' },
+  ],
+}
+
+/* ─── Size Chart Modal ─── */
+const SizeChartModal = ({ isOpen, onClose, category }) => {
+  const chart = sizeChartData[category] || sizeChartData.accessories
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          className="sc-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          onClick={onClose}
+        >
+          <motion.div
+            className="sc-modal"
+            initial={{ opacity: 0, y: 30, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.97 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sc-header">
+              <div>
+                <h3 className="sc-title">Size Chart</h3>
+                <span className="sc-subtitle">{chart.label}</span>
+              </div>
+              <button className="sc-close" onClick={onClose}><FiX /></button>
+            </div>
+
+            <div className="sc-table-wrap">
+              <table className="sc-table">
+                <thead>
+                  <tr>
+                    {chart.headers.map((h) => <th key={h}>{h}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {chart.rows.map((row, i) => (
+                    <tr key={i}>
+                      {row.map((cell, j) => (
+                        <td key={j} className={j === 0 ? 'sc-size-cell' : ''}>{cell}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <p className="sc-note">
+              All measurements are approximate. Handcrafted items may vary slightly.
+            </p>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
 }
 
 const ProductDetail = () => {
   const { id } = useParams()
   const navigate = useNavigate()
 
-  // Use context hooks
   const { products, loading: productsLoading, getProductById } = useProducts()
   const { addToCart } = useCart()
   const { favorites, toggleFavorite } = useFavorites()
   const { isAuthenticated } = useAuth()
 
-  // Get product from Supabase (with fallback to static data)
-  const supabaseProduct = getProductById(id)
-  const staticProduct = STATIC_PRODUCTS_DETAIL.find(p => p.id === parseInt(id))
-  const product = supabaseProduct || staticProduct
+  const product = getProductById(id)
+  const isFavorite = favorites.includes(parseInt(id))
 
   // Review state
   const [productReviews, setProductReviews] = useState([])
@@ -194,28 +218,27 @@ const ProductDetail = () => {
   const [reviewsLoading, setReviewsLoading] = useState(true)
   const [votedReviews, setVotedReviews] = useState([])
 
-  // Check if this product is in favorites
-  const isFavorite = favorites.includes(parseInt(id))
-
-  // Debug logging
-  React.useEffect(() => {
-    console.log('ProductDetail - Product ID:', id)
-    console.log('ProductDetail - Supabase Product:', supabaseProduct)
-    console.log('ProductDetail - Final Product:', product)
-  }, [id, supabaseProduct, product])
-
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [selectedColor, setSelectedColor] = useState(0)
-  const [selectedSize, setSelectedSize] = useState('S') // Default size is S
+  const [selectedSize, setSelectedSize] = useState(null)
+  const [isCustomSize, setIsCustomSize] = useState(false)
+  const [customMeasurements, setCustomMeasurements] = useState({})
+  const [isSizeChartOpen, setIsSizeChartOpen] = useState(false)
+  const mainImageRef = useRef(null)
+  const { fly } = useFlyToCart()
 
-  // Fetch reviews when component mounts or product changes
+  // Set default size when product loads
+  useEffect(() => {
+    if (product?.sizes?.length > 0 && !selectedSize) {
+      setSelectedSize(product.sizes[0])
+    }
+  }, [product, selectedSize])
+
+  // Fetch reviews
   useEffect(() => {
     if (product) {
       fetchReviews()
-      if (isAuthenticated) {
-        fetchUserReview()
-      }
-      // Load voted reviews from localStorage
+      if (isAuthenticated) fetchUserReview()
       setVotedReviews(reviewService.getVotedReviews())
     }
   }, [product, isAuthenticated])
@@ -248,11 +271,8 @@ const ProductDetail = () => {
   const handleReviewModalClose = (success) => {
     setIsReviewModalOpen(false)
     if (success) {
-      // Refresh reviews after successful submission
       fetchReviews()
-      if (isAuthenticated) {
-        fetchUserReview()
-      }
+      if (isAuthenticated) fetchUserReview()
     }
   }
 
@@ -268,453 +288,481 @@ const ProductDetail = () => {
   const handleMarkHelpful = async (reviewId) => {
     try {
       const result = await reviewService.toggleHelpfulVote(reviewId)
-
-      // Update local state immediately for better UX
-      setProductReviews((prevReviews) =>
-        prevReviews.map((review) =>
-          review.id === reviewId
-            ? { ...review, helpful_count: result.newCount }
-            : review
-        )
+      setProductReviews((prev) =>
+        prev.map((r) => r.id === reviewId ? { ...r, helpful_count: result.newCount } : r)
       )
-
-      // Update voted reviews state
       setVotedReviews(reviewService.getVotedReviews())
     } catch (error) {
       console.error('Error toggling helpful vote:', error)
-      // Optionally show error message to user
-      alert('Failed to update vote. Please try again.')
     }
   }
 
   const formatDate = (dateString) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric', month: 'short', day: 'numeric',
     })
   }
 
-  const isUserOwnReview = (review) => {
-    return userReview && userReview.id === review.id
+  const nextImage = () => setCurrentImageIndex((p) => (p + 1) % product.images.length)
+  const prevImage = () => setCurrentImageIndex((p) => p === 0 ? product.images.length - 1 : p - 1)
+
+  const handleAddToCart = () => {
+    // Trigger fly animation
+    if (mainImageRef.current) {
+      const rect = mainImageRef.current.getBoundingClientRect()
+      fly(product.images[currentImageIndex], rect)
+    }
+
+    const sizeValue = isCustomSize
+      ? `Custom (${Object.entries(customMeasurements).filter(([,v]) => v).map(([k,v]) => {
+          const field = (customMeasurementFields[product.category] || []).find(f => f.key === k)
+          return `${field?.label || k}: ${v}${field?.unit ? ' ' + field.unit : ''}`
+        }).join(', ')})`
+      : (selectedSize || product.sizes?.[0] || 'S')
+
+    addToCart({
+      ...product,
+      quantity: 1,
+      selectedColor: product.colors[selectedColor],
+      selectedSize: sizeValue
+    })
   }
 
-  // Show loading state
+  const renderStars = (rating) => (
+    [...Array(5)].map((_, i) => (
+      <FiStar key={i} className={i < Math.floor(rating) ? 'star filled' : 'star'} />
+    ))
+  )
+
+  const isOutOfStock = product?.stock_quantity === 0
+  const isLowStock = product?.stock_quantity !== undefined
+    && product?.stock_quantity <= (product?.low_stock_threshold || 10)
+    && product?.stock_quantity > 0
+
+  // ── Loading ──
   if (productsLoading) {
     return (
-      <div className="product-not-found">
-        <h2>Loading product from Supabase...</h2>
+      <div className="pd-page">
+        <div className="pd-layout">
+          <div className="pd-gallery">
+            <div className="skeleton pd-skeleton-main" />
+            <div className="pd-thumbs">
+              {[0,1,2].map(i => <div key={i} className="skeleton pd-skeleton-thumb" />)}
+            </div>
+          </div>
+          <div className="pd-info">
+            <div className="skeleton" style={{ height: 14, width: 80, marginBottom: 16 }} />
+            <div className="skeleton" style={{ height: 36, width: '70%', marginBottom: 12 }} />
+            <div className="skeleton" style={{ height: 28, width: 100, marginBottom: 24 }} />
+            <div className="skeleton" style={{ height: 80, marginBottom: 24 }} />
+            <div style={{ display: 'flex', gap: 8 }}>
+              {[0,1,2].map(i => <div key={i} className="skeleton" style={{ width: 32, height: 32, borderRadius: '50%' }} />)}
+            </div>
+          </div>
+        </div>
       </div>
     )
   }
 
   if (!product) {
     return (
-      <div className="product-not-found">
+      <div className="pd-not-found">
         <h2>Product not found</h2>
-        <button onClick={() => navigate('/products')}>Back to Products</button>
+        <p>The product you're looking for doesn't exist.</p>
+        <button onClick={() => navigate('/products')}>Browse Collection</button>
       </div>
     )
   }
 
-  const nextImage = () => {
-    setCurrentImageIndex((prev) => (prev + 1) % product.images.length)
-  }
-
-  const prevImage = () => {
-    setCurrentImageIndex((prev) =>
-      prev === 0 ? product.images.length - 1 : prev - 1
-    )
-  }
-
-  const handleAddToCart = () => {
-    // Add to cart with quantity 1
-    addToCart({ ...product, quantity: 1, selectedColor: product.colors[selectedColor], selectedSize })
-  }
-
-  const renderStars = (rating) => {
-    return [...Array(5)].map((_, index) => (
-      <FiStar
-        key={index}
-        className={index < Math.floor(rating) ? 'star filled' : 'star'}
-      />
-    ))
-  }
-
   return (
-    <div className="product-detail-page">
-      {/* Back Button */}
-      <motion.button
-        className="back-button"
-        onClick={() => navigate("/products")}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-      >
-        <FiArrowLeft /> Back to Products
-      </motion.button>
+    <div className="pd-page">
 
-      <div className="product-detail-container">
-        {/* Left Side - Image Gallery */}
+      {/* Breadcrumb */}
+      <nav className="pd-breadcrumb">
+        <Link to="/">Home</Link>
+        <span className="pd-breadcrumb__sep">/</span>
+        <Link to="/products">Products</Link>
+        <span className="pd-breadcrumb__sep">/</span>
+        <span className="pd-breadcrumb__current">{product.name}</span>
+      </nav>
+
+      {/* ── Main Layout ── */}
+      <div className="pd-layout">
+
+        {/* Gallery */}
         <motion.div
-          className="product-gallery"
-          initial={{ opacity: 0, x: -50 }}
+          className="pd-gallery"
+          initial={{ opacity: 0, x: -30 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.6 }}
+          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         >
-          <div className="main-image-container">
-            <img
-              src={product.images[currentImageIndex]}
-              alt={product.name}
-              className="main-product-image"
-            />
+          <div className="pd-main-image" ref={mainImageRef}>
+            <AnimatePresence mode="wait">
+              <motion.img
+                key={currentImageIndex}
+                src={product.images[currentImageIndex]}
+                alt={product.name}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              />
+            </AnimatePresence>
 
-            {/* Navigation Arrows */}
             {product.images.length > 1 && (
               <>
-                <button className="gallery-btn prev-btn" onClick={prevImage}>
+                <button className="pd-gallery-btn pd-gallery-btn--prev" onClick={prevImage}>
                   <FiChevronLeft />
                 </button>
-                <button className="gallery-btn next-btn" onClick={nextImage}>
+                <button className="pd-gallery-btn pd-gallery-btn--next" onClick={nextImage}>
                   <FiChevronRight />
                 </button>
               </>
             )}
 
-            {/* Favorite Button */}
             <motion.button
-              className={`favorite-btn-detail ${isFavorite ? "active" : ""}`}
+              className={`pd-fav-btn${isFavorite ? ' active' : ''}`}
               onClick={() => toggleFavorite(parseInt(id))}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
+              whileTap={{ scale: 0.85 }}
             >
               <FiHeart />
             </motion.button>
+
+            {isOutOfStock && (
+              <div className="pd-sold-out">Sold Out</div>
+            )}
           </div>
 
-          {/* Thumbnail Images */}
-          <div className="thumbnail-container">
-            {product.images.map((img, index) => (
-              <motion.div
-                key={index}
-                className={`thumbnail ${
-                  index === currentImageIndex ? "active" : ""
-                }`}
-                onClick={() => setCurrentImageIndex(index)}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <img src={img} alt={`${product.name} ${index + 1}`} />
-              </motion.div>
-            ))}
-          </div>
+          {/* Thumbnails */}
+          {product.images.length > 1 && (
+            <div className="pd-thumbs">
+              {product.images.map((img, i) => (
+                <button
+                  key={i}
+                  className={`pd-thumb${i === currentImageIndex ? ' active' : ''}`}
+                  onClick={() => setCurrentImageIndex(i)}
+                >
+                  <img src={img} alt={`${product.name} ${i + 1}`} />
+                </button>
+              ))}
+            </div>
+          )}
         </motion.div>
 
-        {/* Right Side - Product Info */}
+        {/* Product Info */}
         <motion.div
-          className="product-info-section"
-          initial={{ opacity: 0, x: 50 }}
+          className="pd-info"
+          initial={{ opacity: 0, x: 30 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
+          transition={{ duration: 0.5, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
         >
-          <div className="product-header">
-            <h1 className="product-title">{product.name}</h1>
-            {!reviewsLoading && reviewStats && (
-              <div className="product-rating">
-                <div className="stars">
-                  {renderStars(reviewStats.averageRating)}
-                </div>
-                <span className="rating-text">
-                  {reviewStats.averageRating > 0
-                    ? reviewStats.averageRating
-                    : "No rating yet"}
-                  {reviewStats.totalReviews > 0 &&
-                    ` (${reviewStats.totalReviews} ${
-                      reviewStats.totalReviews === 1 ? "review" : "reviews"
-                    })`}
-                </span>
-              </div>
-            )}
+          {/* Category + Handcrafted label */}
+          <div className="pd-info__top">
+            <span className="pd-category">{product.category}</span>
+            <span className="pd-handcrafted">Handcrafted</span>
           </div>
 
-          <div className="product-price-large">${product.price}</div>
+          <h1 className="pd-title">{product.name}</h1>
 
-          {/* Low Stock Warning */}
-          {product.stock_quantity !== undefined &&
-            product.stock_quantity <= (product.low_stock_threshold || 10) &&
-            product.stock_quantity > 0 && (
-              <div className="low-stock-warning">
-                <span className="warning-icon">🧶</span>
-                <div className="warning-content">
-                  <p>
-                    Only {product.stock_quantity}{" "}
-                    {product.stock_quantity === 1 ? "left" : "left"} in stock
-                  </p>
-                </div>
-              </div>
-            )}
-          {product.stock_quantity === 0 && (
-            <div className="out-of-stock-warning">
-              <span className="warning-icon">✕</span>
-              <div className="warning-content">
-                <p>Currently unavailable</p>
-              </div>
+          {/* Rating */}
+          {!reviewsLoading && reviewStats && reviewStats.averageRating > 0 && (
+            <div className="pd-rating">
+              <div className="pd-rating__stars">{renderStars(reviewStats.averageRating)}</div>
+              <span className="pd-rating__text">
+                {reviewStats.averageRating}
+                {reviewStats.totalReviews > 0 && ` (${reviewStats.totalReviews})`}
+              </span>
             </div>
           )}
 
-          <p className="product-description-full">{product.fullDescription}</p>
+          <div className="pd-price">&#8377;{product.price}</div>
+
+          {/* Stock */}
+          {isLowStock && (
+            <span className="pd-low-stock">Only {product.stock_quantity} left in stock</span>
+          )}
+          {isOutOfStock && (
+            <span className="pd-out-of-stock">Currently unavailable</span>
+          )}
+
+          {/* Description */}
+          <p className="pd-description">{product.fullDescription || product.description}</p>
+
+          {/* Stitch divider */}
+          <div className="pd-stitch" />
 
           {/* Color Selection */}
-          <div className="color-selection">
-            <h3>Available Colors:</h3>
-            <div className="color-options">
-              {product.colors.map((color, index) => (
-                <motion.div
-                  key={index}
-                  className={`color-option ${
-                    index === selectedColor ? "selected" : ""
-                  }`}
-                  style={{ backgroundColor: color }}
-                  onClick={() => setSelectedColor(index)}
-                  whileHover={{ scale: 1.2 }}
-                  whileTap={{ scale: 0.9 }}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Size Selection */}
-          {product.sizes && product.sizes.length > 0 && (
-            <div className="size-selection">
-              <h3>Select Size:</h3>
-              <div className="size-options">
-                {product.sizes.map((size) => (
-                  <motion.button
-                    key={size}
-                    className={`size-option-detail ${
-                      selectedSize === size ? "selected" : ""
-                    }`}
-                    onClick={() => setSelectedSize(size)}
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    {size}
-                  </motion.button>
+          {product.colors && product.colors.length > 0 && (
+            <div className="pd-option-group">
+              <h3 className="pd-option-label">Color</h3>
+              <div className="pd-colors">
+                {product.colors.map((color, i) => (
+                  <button
+                    key={i}
+                    className={`pd-color-dot${i === selectedColor ? ' active' : ''}`}
+                    style={{ backgroundColor: color }}
+                    onClick={() => setSelectedColor(i)}
+                  />
                 ))}
               </div>
             </div>
           )}
 
-          {/* Product Details */}
-          <div className="product-specs">
-            <h3>Product Details:</h3>
-            <ul>
-              <li>
-                <strong>Materials:</strong> {(product.materials || []).join(", ") || "N/A"}
-              </li>
-              <li>
-                <strong>Dimensions:</strong> {product.dimensions}
-              </li>
-              <li>
-                <strong>Weight:</strong> {product.weight}
-              </li>
-              <li>
-                <strong>Category:</strong>{" "}
-                <span className="category-badge-detail">
-                  {product.difficulty}
-                </span>
-              </li>
-            </ul>
-          </div>
+          {/* Size Selection */}
+          {product.sizes && product.sizes.length > 0 && (
+            <div className="pd-option-group">
+              <div className="pd-size-header">
+                <h3 className="pd-option-label">Size</h3>
+                <button
+                  className="pd-size-chart-link"
+                  onClick={() => setIsSizeChartOpen(true)}
+                >
+                  <FiMaximize2 /> Size Chart
+                </button>
+              </div>
+              <div className="pd-sizes">
+                {product.sizes.map((size) => (
+                  <button
+                    key={size}
+                    className={`pd-size-btn${!isCustomSize && selectedSize === size ? ' active' : ''}`}
+                    onClick={() => { setSelectedSize(size); setIsCustomSize(false) }}
+                  >
+                    {size}
+                  </button>
+                ))}
+                <button
+                  className={`pd-size-btn pd-size-btn--custom${isCustomSize ? ' active' : ''}`}
+                  onClick={() => setIsCustomSize(!isCustomSize)}
+                >
+                  Custom
+                </button>
+              </div>
 
-          {/* Care Instructions */}
-          <div className="care-instructions">
-            <h3>Care Instructions:</h3>
-            <p>{product.careInstructions}</p>
-          </div>
+              {/* Custom measurement fields — CSS grid-rows transition */}
+              <div className={`pd-custom-size${isCustomSize ? ' open' : ''}`}>
+                <div className="pd-custom-size__inner">
+                  <p className="pd-custom-size__hint">
+                    Share your measurements and we'll handcraft it to fit you perfectly.
+                  </p>
+                  <div className="pd-custom-size__fields">
+                    {(customMeasurementFields[product.category] || customMeasurementFields.accessories).map((field) => (
+                      <div key={field.key} className="pd-custom-size__field">
+                        <label>{field.label}</label>
+                        <div className="pd-custom-size__input-wrap">
+                          <input
+                            type="text"
+                            placeholder={field.placeholder}
+                            value={customMeasurements[field.key] || ''}
+                            onChange={(e) => setCustomMeasurements(prev => ({
+                              ...prev, [field.key]: e.target.value
+                            }))}
+                          />
+                          {field.unit && <span className="pd-custom-size__unit">{field.unit}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
-          {/* Add to Cart Button */}
+          {/* Add to Bag */}
           <motion.button
-            className="add-to-cart-btn-detail"
+            className="pd-add-to-bag"
             onClick={handleAddToCart}
-            whileHover={product.stock_quantity !== 0 ? { scale: 1.02 } : {}}
-            whileTap={product.stock_quantity !== 0 ? { scale: 0.98 } : {}}
-            disabled={product.stock_quantity === 0}
+            whileHover={!isOutOfStock ? { scale: 1.01 } : {}}
+            whileTap={!isOutOfStock ? { scale: 0.99 } : {}}
+            disabled={isOutOfStock}
           >
-            <FiShoppingCart />{" "}
-            {product.stock_quantity === 0
-              ? "Out of Stock"
-              : `Add to Cart - $${product.price}`}
+            <FiShoppingBag />
+            {isOutOfStock ? 'Out of Stock' : `Add to Bag — ₹${product.price}`}
           </motion.button>
+
+          {/* Trust signals */}
+          <div className="pd-trust">
+            <div className="pd-trust__item">
+              <FiTruck />
+              <span>Free shipping over ₹500</span>
+            </div>
+            <div className="pd-trust__item">
+              <FiShield />
+              <span>Handcrafted quality</span>
+            </div>
+            <div className="pd-trust__item">
+              <FiRefreshCw />
+              <span>Easy returns</span>
+            </div>
+          </div>
+
+          {/* Stitch divider */}
+          <div className="pd-stitch" />
+
+          {/* Product Details accordion-style */}
+          <div className="pd-details">
+            {(product.materials || []).length > 0 && (
+              <div className="pd-detail-row">
+                <span className="pd-detail-key">Materials</span>
+                <span className="pd-detail-val">{product.materials.join(', ')}</span>
+              </div>
+            )}
+            {product.dimensions && (
+              <div className="pd-detail-row">
+                <span className="pd-detail-key">Dimensions</span>
+                <span className="pd-detail-val">{product.dimensions}</span>
+              </div>
+            )}
+            {product.weight && (
+              <div className="pd-detail-row">
+                <span className="pd-detail-key">Weight</span>
+                <span className="pd-detail-val">{product.weight}</span>
+              </div>
+            )}
+            {product.careInstructions && (
+              <div className="pd-detail-row">
+                <span className="pd-detail-key">Care</span>
+                <span className="pd-detail-val">{product.careInstructions}</span>
+              </div>
+            )}
+          </div>
+
+          {/* ── Reviews Section (inside right column) ── */}
+          <div className="pd-stitch" />
+          <motion.section
+            className="pd-reviews"
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.3 }}
+          >
+            <div className="pd-reviews__header">
+              <div>
+                <h2>Reviews</h2>
+                {!reviewsLoading && reviewStats && reviewStats.totalReviews > 0 && (
+                  <span className="pd-reviews__header-count">
+                    {reviewStats.totalReviews} review{reviewStats.totalReviews !== 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
+              {reviewStats && reviewStats.totalReviews > 0 && !userReview && (
+                <button className="pd-write-review-btn" onClick={handleWriteReview}>
+                  <FiEdit3 /> Write a Review
+                </button>
+              )}
+            </div>
+
+            {reviewsLoading ? (
+              <div className="pd-reviews-loading">
+                {[0, 1, 2].map(i => (
+                  <div key={i} className="skeleton" style={{ height: 80, borderRadius: 12, marginBottom: 10 }} />
+                ))}
+              </div>
+            ) : reviewStats && reviewStats.totalReviews > 0 ? (
+              <>
+                {/* Summary */}
+                <div className="pd-reviews__summary">
+                  <div className="pd-reviews__overview">
+                    <span className="pd-reviews__big-num">{reviewStats.averageRating}</span>
+                    <div className="pd-reviews__overview-right">
+                      <div className="pd-reviews__stars-row">{renderStars(reviewStats.averageRating)}</div>
+                      <span className="pd-reviews__count-text">out of 5</span>
+                    </div>
+                  </div>
+
+                  <div className="pd-reviews__bars">
+                    {[5, 4, 3, 2, 1].map((star) => {
+                      const count = reviewStats.ratingDistribution[star]
+                      const pct = reviewStats.totalReviews > 0 ? (count / reviewStats.totalReviews) * 100 : 0
+                      return (
+                        <div key={star} className="pd-bar-row">
+                          <span className="pd-bar-label">{star}</span>
+                          <FiStar className="pd-bar-star-icon" />
+                          <div className="pd-bar-track">
+                            <motion.div
+                              className="pd-bar-fill"
+                              initial={{ width: 0 }}
+                              animate={{ width: `${pct}%` }}
+                              transition={{ duration: 0.6, delay: (5 - star) * 0.08 }}
+                            />
+                          </div>
+                          <span className="pd-bar-count">{count}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Review List */}
+                <div className="pd-reviews__list">
+                  {productReviews.map((review, i) => (
+                    <motion.div
+                      key={review.id}
+                      className="pd-review-card"
+                      initial={{ opacity: 0, y: 16 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.05, duration: 0.35 }}
+                    >
+                      <div className="pd-review-card__top">
+                        <div className="pd-review-card__author-row">
+                          <span className="pd-review-author">{review.user_name || 'Anonymous'}</span>
+                          {review.is_verified_purchase && (
+                            <span className="pd-review-verified">Verified</span>
+                          )}
+                          <span className="pd-review-date">{formatDate(review.created_at)}</span>
+                        </div>
+                        <div className="pd-review-stars">{renderStars(review.rating)}</div>
+                      </div>
+
+                      {review.title && <h4 className="pd-review-title">{review.title}</h4>}
+                      {review.review_text && <p className="pd-review-text">{review.review_text}</p>}
+
+                      {review.images && review.images.length > 0 && (
+                        <div className="pd-review-images">
+                          {review.images.map((img, idx) => (
+                            <img key={idx} src={img} alt={`Review ${idx + 1}`} />
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="pd-review-card__footer">
+                        <button
+                          className={`pd-helpful-btn${votedReviews.includes(review.id) ? ' voted' : ''}`}
+                          onClick={() => handleMarkHelpful(review.id)}
+                        >
+                          <FiThumbsUp /> Helpful ({review.helpful_count || 0})
+                        </button>
+
+                        {userReview && userReview.id === review.id && (
+                          <button className="pd-edit-btn" onClick={handleWriteReview}>
+                            <FiEdit3 /> Edit
+                          </button>
+                        )}
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="pd-no-reviews">
+                <div className="pd-no-reviews__icon">
+                  <FiStar />
+                </div>
+                <h3>No reviews yet</h3>
+                <p>Be the first to share your experience with this piece.</p>
+                <button className="pd-write-review-btn" onClick={handleWriteReview}>
+                  <FiEdit3 /> Write a Review
+                </button>
+              </div>
+            )}
+          </motion.section>
         </motion.div>
       </div>
 
-      {/* Reviews Section */}
-      <motion.div
-        className="reviews-section"
-        initial={{ opacity: 0, y: 50 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, delay: 0.4 }}
-      >
-        <div className="reviews-header">
-          <h2>Customer Reviews</h2>
-          {/* Only show write review button when there are existing reviews */}
-          {reviewStats && reviewStats.totalReviews > 0 && !userReview && (
-            <motion.button
-              className="write-review-btn"
-              onClick={handleWriteReview}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <FiEdit3 /> Write a Review
-            </motion.button>
-          )}
-        </div>
-
-        {reviewsLoading ? (
-          <div className="reviews-loading">
-            <p>Loading reviews...</p>
-          </div>
-        ) : reviewStats && reviewStats.totalReviews > 0 ? (
-          <>
-            <div className="reviews-summary">
-              <div className="rating-overview">
-                <div className="large-rating">{reviewStats.averageRating}</div>
-                <div className="stars-large">
-                  {renderStars(reviewStats.averageRating)}
-                </div>
-                <div className="review-count-text">
-                  Based on {reviewStats.totalReviews} review
-                  {reviewStats.totalReviews !== 1 ? "s" : ""}
-                </div>
-                {reviewStats.verifiedPurchases > 0 && (
-                  <div className="verified-count">
-                    {reviewStats.verifiedPurchases} verified purchase
-                    {reviewStats.verifiedPurchases !== 1 ? "s" : ""}
-                  </div>
-                )}
-              </div>
-
-              <div className="rating-distribution">
-                {[5, 4, 3, 2, 1].map((star) => {
-                  const count = reviewStats.ratingDistribution[star];
-                  const percentage =
-                    reviewStats.totalReviews > 0
-                      ? (count / reviewStats.totalReviews) * 100
-                      : 0;
-                  return (
-                    <div key={star} className="rating-bar">
-                      <span className="star-label">{star} star</span>
-                      <div className="bar-container">
-                        <div
-                          className="bar-fill"
-                          style={{ width: `${percentage}%` }}
-                        />
-                      </div>
-                      <span className="count-label">{count}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="reviews-list">
-              {productReviews.map((review) => (
-                <motion.div
-                  key={review.id}
-                  className="review-card"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4 }}
-                >
-                  <div className="review-header">
-                    <div className="review-author">
-                      <span className="author-name">
-                        {review.user_name || "Anonymous"}
-                      </span>
-                      {review.is_verified_purchase && (
-                        <span className="verified-badge">
-                          ✓ Verified Purchase
-                        </span>
-                      )}
-                    </div>
-                    <div className="review-stars">
-                      {renderStars(review.rating)}
-                    </div>
-                  </div>
-                  <div className="review-date">
-                    {formatDate(review.created_at)}
-                  </div>
-                  {review.title && (
-                    <h4 className="review-title">{review.title}</h4>
-                  )}
-                  {review.review_text && (
-                    <p className="review-comment">{review.review_text}</p>
-                  )}
-
-                  {review.images && review.images.length > 0 && (
-                    <div className="review-images">
-                      {review.images.map((image, index) => (
-                        <img
-                          key={index}
-                          src={image}
-                          alt={`Review ${index + 1}`}
-                          className="review-image"
-                        />
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="review-footer">
-                    <motion.button
-                      className={`helpful-btn ${
-                        votedReviews.includes(review.id) ? "voted" : ""
-                      }`}
-                      onClick={() => handleMarkHelpful(review.id)}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      <FiThumbsUp />{" "}
-                      {votedReviews.includes(review.id) ? "Helpful" : "Helpful"}{" "}
-                      ({review.helpful_count || 0})
-                    </motion.button>
-
-                    {/* Show Edit button only on user's own review */}
-                    {isUserOwnReview(review) && (
-                      <motion.button
-                        className="edit-review-btn"
-                        onClick={handleWriteReview}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                      >
-                        <FiEdit3 /> Edit
-                      </motion.button>
-                    )}
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </>
-        ) : (
-          <div className="no-reviews">
-            <div className="no-reviews-icon">
-              <FiStar size={48} />
-            </div>
-            <h3>No reviews yet</h3>
-            <p>Be the first one to share your experience with this product!</p>
-            <motion.button
-              className="first-review-btn"
-              onClick={handleWriteReview}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <FiEdit3 /> Write the First Review
-            </motion.button>
-          </div>
-        )}
-      </motion.div>
+      {/* Size Chart Modal */}
+      <SizeChartModal
+        isOpen={isSizeChartOpen}
+        onClose={() => setIsSizeChartOpen(false)}
+        category={product.category}
+      />
 
       {/* Review Modal */}
       <ReviewModal
@@ -725,7 +773,7 @@ const ProductDetail = () => {
         existingReview={userReview}
       />
     </div>
-  );
+  )
 }
 
 export default ProductDetail

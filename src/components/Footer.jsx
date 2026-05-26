@@ -1,5 +1,6 @@
 import React from 'react'
 import { motion } from 'framer-motion'
+import { Link } from 'react-router-dom'
 import { FiMail, FiPhone, FiMapPin, FiFacebook, FiInstagram, FiTwitter } from 'react-icons/fi'
 import './Footer.css'
 
@@ -57,11 +58,10 @@ const Footer = () => {
           >
             <h4>Quick Links</h4>
             <ul>
-              <li><a href="#home">Home</a></li>
-              <li><a href="#collections">Collections</a></li>
-              <li><a href="#products">Products</a></li>
-              <li><a href="#story">Our Story</a></li>
-              <li><a href="#contact">Contact Us</a></li>
+              <li><Link to="/">Home</Link></li>
+              <li><Link to="/products">Products</Link></li>
+              {/* <li><Link to="/our-story">Our Story</Link></li> */}
+              <li><Link to="/contact">Contact Us</Link></li>
             </ul>
           </motion.div>
 
@@ -97,11 +97,11 @@ const Footer = () => {
               </div>
               <div className="contact-item">
                 <FiPhone />
-                <span>+1 (555) 123-4567</span>
+                <span>+91 98765 43210</span>
               </div>
               <div className="contact-item">
                 <FiMapPin />
-                <span>123 Craft Street, Artisan City</span>
+                <span>Jaipur, Rajasthan, India</span>
               </div>
             </div>
             <div className="newsletter">
@@ -126,7 +126,7 @@ const Footer = () => {
           viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.4 }}
         >
-          <p>&copy; 2024 Nani ki Bunai. All rights reserved. Handcrafted with love.</p>
+          <p>&copy; 2025 Nani ki Bunai. All rights reserved. Handcrafted with love.</p>
           <div className="footer-links">
             <a href="#privacy">Privacy Policy</a>
             <a href="#terms">Terms of Service</a>

@@ -196,7 +196,9 @@
 }
 
 .form-group input::placeholder {
-  color: var(--warm-gray);
+  color: var(--text-muted);
+  opacity: 0.6;
+  font-style: italic;
 }
 
 .form-group small {

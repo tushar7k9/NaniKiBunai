@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { FiX, FiStar, FiUpload, FiImage, FiTrash2 } from 'react-icons/fi'
+import { FiX, FiStar, FiCamera, FiTrash2 } from 'react-icons/fi'
 import { useAuth } from '../hooks/useAuth'
 import { reviewService } from '../services/reviewService'
 import './ReviewModal.css'
+
+const ratingLabels = ['', 'Awful', 'Poor', 'Okay', 'Good', 'Loved it!']
 
 const ReviewModal = ({ isOpen, onClose, productId, productName, existingReview = null }) => {
   const { user, isAuthenticated } = useAuth()
@@ -16,7 +18,6 @@ const ReviewModal = ({ isOpen, onClose, productId, productName, existingReview =
   const [error, setError] = useState(null)
   const [purchaseStatus, setPurchaseStatus] = useState(null)
 
-  // Update state when existingReview changes (for editing)
   useEffect(() => {
     if (existingReview) {
       setRating(existingReview.rating || 0)
@@ -24,7 +25,6 @@ const ReviewModal = ({ isOpen, onClose, productId, productName, existingReview =
       setReviewText(existingReview.review_text || '')
       setImages(existingReview.images || [])
     } else {
-      // Reset form when creating new review
       setRating(0)
       setTitle('')
       setReviewText('')
@@ -38,6 +38,16 @@ const ReviewModal = ({ isOpen, onClose, productId, productName, existingReview =
       checkPurchaseStatus()
     }
   }, [isOpen, isAuthenticated, productId])
+
+  // Lock body scroll when open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [isOpen])
 
   const checkPurchaseStatus = async () => {
     try {
@@ -55,14 +65,12 @@ const ReviewModal = ({ isOpen, onClose, productId, productName, existingReview =
       return
     }
 
-    // Convert images to base64 for storage
     const imagePromises = files.map((file) => {
       return new Promise((resolve, reject) => {
         if (file.size > 5 * 1024 * 1024) {
           reject(new Error('Image size must be less than 5MB'))
           return
         }
-
         const reader = new FileReader()
         reader.onload = (e) => resolve(e.target.result)
         reader.onerror = reject
@@ -75,9 +83,7 @@ const ReviewModal = ({ isOpen, onClose, productId, productName, existingReview =
         setImages([...images, ...base64Images])
         setError(null)
       })
-      .catch((err) => {
-        setError(err.message)
-      })
+      .catch((err) => setError(err.message))
   }
 
   const removeImage = (index) => {
@@ -92,14 +98,12 @@ const ReviewModal = ({ isOpen, onClose, productId, productName, existingReview =
       setError('You must be logged in to submit a review')
       return
     }
-
     if (rating === 0) {
       setError('Please select a rating')
       return
     }
 
     setIsSubmitting(true)
-
     try {
       const reviewData = {
         productId,
@@ -114,8 +118,7 @@ const ReviewModal = ({ isOpen, onClose, productId, productName, existingReview =
       } else {
         await reviewService.createReview(reviewData)
       }
-
-      onClose(true) // Pass true to indicate successful submission
+      onClose(true)
     } catch (err) {
       console.error('Error submitting review:', err)
       setError(err.message || 'Failed to submit review. Please try again.')
@@ -124,164 +127,200 @@ const ReviewModal = ({ isOpen, onClose, productId, productName, existingReview =
     }
   }
 
-  if (!isOpen) return null
+  const activeRating = hoveredRating || rating
 
   return (
     <AnimatePresence>
-      <motion.div
-        className="review-modal-overlay"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-      >
+      {isOpen && (
         <motion.div
-          className="review-modal-content"
-          initial={{ opacity: 0, scale: 0.9, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.9, y: 20 }}
-          onClick={(e) => e.stopPropagation()}
+          className="rm-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          onClick={() => onClose(false)}
         >
-          <div className="review-modal-header">
-            <div>
-              <h2>{existingReview ? 'Edit Your Review' : 'Write a Review'}</h2>
-              <p className="product-name">{productName}</p>
+          <motion.div
+            className="rm-modal"
+            initial={{ opacity: 0, y: 40, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 30, scale: 0.97 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="rm-header">
+              <div>
+                <h2 className="rm-title">
+                  {existingReview ? 'Edit Your Review' : 'Share Your Experience'}
+                </h2>
+                <span className="rm-product-name">{productName}</span>
+              </div>
+              <button className="rm-close" onClick={() => onClose(false)}>
+                <FiX />
+              </button>
             </div>
-            <button className="close-btn" onClick={onClose}>
-              <FiX />
-            </button>
-          </div>
 
-          {purchaseStatus?.hasPurchased && (
-            <div className="verified-purchase-badge">
-              <span>You purchased this product - Your review will be marked as verified</span>
-            </div>
-          )}
+            <div className="rm-stitch" />
 
-          <form className="review-modal-form" onSubmit={handleSubmit}>
-            {error && (
-              <div className="review-error">
-                {error}
+            {/* Verified badge */}
+            {purchaseStatus?.hasPurchased && (
+              <div className="rm-verified">
+                <span>Your review will be marked as a verified purchase</span>
               </div>
             )}
 
-            <div className="form-group">
-              <label>Rating *</label>
-              <div className="star-rating">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
-                    type="button"
-                    className={`star-btn ${star <= (hoveredRating || rating) ? 'active' : ''}`}
-                    onClick={() => setRating(star)}
-                    onMouseEnter={() => setHoveredRating(star)}
-                    onMouseLeave={() => setHoveredRating(0)}
-                  >
-                    <FiStar />
-                  </button>
-                ))}
-                <span className="rating-text">
-                  {rating === 0 ? 'Select a rating' : `${rating} out of 5 stars`}
-                </span>
-              </div>
-            </div>
+            <form className="rm-form" onSubmit={handleSubmit}>
+              {/* Error */}
+              {error && (
+                <motion.div
+                  className="rm-error"
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  {error}
+                </motion.div>
+              )}
 
-            <div className="form-group">
-              <label htmlFor="title">Review Title (Optional)</label>
-              <input
-                type="text"
-                id="title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Summarize your experience"
-                maxLength={100}
-              />
-              <span className="char-count">{title.length}/100</span>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="reviewText">Your Review (Optional)</label>
-              <textarea
-                id="reviewText"
-                value={reviewText}
-                onChange={(e) => setReviewText(e.target.value)}
-                placeholder="Tell us what you think about this product..."
-                rows={5}
-                maxLength={1000}
-              />
-              <span className="char-count">{reviewText.length}/1000</span>
-            </div>
-
-            <div className="form-group">
-              <label>Photos (Optional)</label>
-              <p className="help-text">Add up to 5 photos (max 5MB each)</p>
-
-              <div className="image-upload-area">
-                {images.length < 5 && (
-                  <label className="upload-btn">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      onChange={handleImageUpload}
-                      style={{ display: 'none' }}
-                    />
-                    <FiUpload />
-                    <span>Upload Photos</span>
-                  </label>
-                )}
-
-                {images.length > 0 && (
-                  <div className="image-preview-grid">
-                    {images.map((image, index) => (
-                      <div key={index} className="image-preview">
-                        <img src={image} alt={`Preview ${index + 1}`} />
-                        <button
-                          type="button"
-                          className="remove-image-btn"
-                          onClick={() => removeImage(index)}
-                        >
-                          <FiTrash2 />
-                        </button>
-                      </div>
+              {/* Star Rating */}
+              <div className="rm-field">
+                <label className="rm-label">Rating</label>
+                <div className="rm-stars">
+                  <div className="rm-stars__row">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <motion.button
+                        key={star}
+                        type="button"
+                        className={`rm-star${star <= activeRating ? ' filled' : ''}`}
+                        onClick={() => setRating(star)}
+                        onMouseEnter={() => setHoveredRating(star)}
+                        onMouseLeave={() => setHoveredRating(0)}
+                        whileTap={{ scale: 0.85 }}
+                      >
+                        <FiStar />
+                      </motion.button>
                     ))}
                   </div>
-                )}
+                  <AnimatePresence mode="wait">
+                    <motion.span
+                      key={activeRating}
+                      className={`rm-stars__label${activeRating >= 4 ? ' positive' : ''}`}
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      transition={{ duration: 0.15 }}
+                    >
+                      {activeRating > 0 ? ratingLabels[activeRating] : 'Tap to rate'}
+                    </motion.span>
+                  </AnimatePresence>
+                </div>
               </div>
-            </div>
 
-            <div className="review-modal-footer">
-              <motion.button
-                type="button"
-                className="cancel-btn"
-                onClick={onClose}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </motion.button>
-              <motion.button
-                type="submit"
-                className="submit-btn"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                disabled={isSubmitting || rating === 0}
-              >
-                {isSubmitting
-                  ? 'Submitting...'
-                  : existingReview
-                  ? 'Update Review'
-                  : 'Submit Review'}
-              </motion.button>
-            </div>
+              {/* Title */}
+              <div className="rm-field">
+                <label className="rm-label" htmlFor="rm-title">
+                  Title <span className="rm-optional">optional</span>
+                </label>
+                <input
+                  type="text"
+                  id="rm-title"
+                  className="rm-input"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Summarize your experience"
+                  maxLength={100}
+                />
+                <span className="rm-char-count">{title.length}/100</span>
+              </div>
 
-            <p className="review-disclaimer">
-              Your review will be visible after approval. Please follow our community guidelines.
-            </p>
-          </form>
+              {/* Review Text */}
+              <div className="rm-field">
+                <label className="rm-label" htmlFor="rm-text">
+                  Review <span className="rm-optional">optional</span>
+                </label>
+                <textarea
+                  id="rm-text"
+                  className="rm-textarea"
+                  value={reviewText}
+                  onChange={(e) => setReviewText(e.target.value)}
+                  placeholder="What did you love about this piece? How does it feel?"
+                  rows={4}
+                  maxLength={1000}
+                />
+                <span className="rm-char-count">{reviewText.length}/1000</span>
+              </div>
+
+              {/* Image Upload */}
+              <div className="rm-field">
+                <label className="rm-label">
+                  Photos <span className="rm-optional">up to 5</span>
+                </label>
+
+                <div className="rm-upload-area">
+                  {images.length > 0 && (
+                    <div className="rm-image-grid">
+                      {images.map((image, index) => (
+                        <div key={index} className="rm-image-preview">
+                          <img src={image} alt={`Preview ${index + 1}`} />
+                          <button
+                            type="button"
+                            className="rm-image-remove"
+                            onClick={() => removeImage(index)}
+                          >
+                            <FiTrash2 />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {images.length < 5 && (
+                    <label className="rm-upload-btn">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={handleImageUpload}
+                        style={{ display: 'none' }}
+                      />
+                      <FiCamera />
+                      <span>Add Photos</span>
+                    </label>
+                  )}
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="rm-footer">
+                <button
+                  type="button"
+                  className="rm-btn rm-btn--cancel"
+                  onClick={() => onClose(false)}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </button>
+                <motion.button
+                  type="submit"
+                  className="rm-btn rm-btn--submit"
+                  disabled={isSubmitting || rating === 0}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  {isSubmitting
+                    ? 'Submitting...'
+                    : existingReview
+                    ? 'Update Review'
+                    : 'Submit Review'}
+                </motion.button>
+              </div>
+
+              <p className="rm-disclaimer">
+                Your review will be visible after approval.
+              </p>
+            </form>
+          </motion.div>
         </motion.div>
-      </motion.div>
+      )}
     </AnimatePresence>
   )
 }

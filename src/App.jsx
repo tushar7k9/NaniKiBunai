@@ -4,23 +4,27 @@
  * Now using Context Providers for global state management with Supabase!
  */
 
-import React, { useState } from 'react'
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom'
 
 // Context Providers
 import { AuthProvider } from './contexts/AuthContext'
 import { ProductsProvider } from './contexts/ProductsContext'
 import { CartProvider } from './contexts/CartContext'
 import { FavoritesProvider } from './contexts/FavoritesContext'
+import { FlyToCartProvider, useFlyToCart } from './components/FlyToCart'
 
 // Components
 import Header from './components/Header'
 import Cart from './components/Cart'
+import SearchOverlay from './components/SearchOverlay'
 import Hero from './components/Hero'
 import Categories from './components/Categories'
 import FeaturedProducts from './components/FeaturedProducts'
+import Testimonials from './components/Testimonials'
 import Story from './components/Story'
 import Footer from './components/Footer'
+import { SketchWaveDivider } from './components/SketchElements'
 
 // Pages
 import Products from './pages/Products'
@@ -42,32 +46,56 @@ import { useCart } from './hooks/useCart'
 import { useFavorites } from './hooks/useFavorites'
 
 /**
+ * Scroll to top on route change
+ */
+function ScrollToTop() {
+  const { pathname } = useLocation()
+  useEffect(() => { window.scrollTo(0, 0) }, [pathname])
+  return null
+}
+
+/**
+ * Homepage composition — defined outside AppContent to prevent remounts
+ */
+const HomePage = () => (
+  <>
+    <Hero />
+    <Categories />
+    <SketchWaveDivider />
+    <FeaturedProducts />
+    <Testimonials />
+    <SketchWaveDivider />
+    <Story />
+  </>
+)
+
+/**
  * Main App Content (wrapped by providers)
  */
 function AppContent() {
   const [isCartOpen, setIsCartOpen] = useState(false)
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
 
   // Get cart and favorites from context
   const { cart, getTotalItems, updateQuantity, removeFromCart } = useCart()
   const { favorites, getFavoritesCount } = useFavorites()
-
-  const HomePage = () => (
-    <>
-      <Hero />
-      <Categories />
-      <FeaturedProducts />
-      <Story />
-    </>
-  )
+  const { cartIconRef } = useFlyToCart()
 
   return (
     <Router>
+      <ScrollToTop />
       <div className="App">
         <Header
           cartCount={getTotalItems()}
           favoritesCount={getFavoritesCount()}
           onCartClick={() => setIsCartOpen(true)}
+          onSearchClick={() => setIsSearchOpen(true)}
           onFavoritesClick={() => {/* Will navigate to /favorites */}}
+          cartIconRef={cartIconRef}
+        />
+        <SearchOverlay
+          isOpen={isSearchOpen}
+          onClose={() => setIsSearchOpen(false)}
         />
         <Cart
           isOpen={isCartOpen}
@@ -83,7 +111,7 @@ function AppContent() {
           <Route path="/favorites" element={<Favorites />} />
           <Route path="/collections" element={<Collections />} />
           <Route path="/contact" element={<Contact />} />
-          <Route path="/our-story" element={<OurStory />} />
+          {/* <Route path="/our-story" element={<OurStory />} /> */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/profile" element={<Profile />} />
@@ -110,7 +138,9 @@ function App() {
       <ProductsProvider>
         <CartProvider>
           <FavoritesProvider>
-            <AppContent />
+            <FlyToCartProvider>
+              <AppContent />
+            </FlyToCartProvider>
           </FavoritesProvider>
         </CartProvider>
       </ProductsProvider>

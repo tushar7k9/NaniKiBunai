@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { motion, useScroll, useTransform } from 'framer-motion'
+import { Link } from 'react-router-dom'
 import { FiHeart, FiAward, FiUsers, FiTrendingUp } from 'react-icons/fi'
 import './OurStory.css'
 
@@ -356,22 +357,8 @@ const OurStory = () => {
             special for you and your loved ones.
           </p>
           <div className="cta-buttons">
-            <motion.a
-              href="/products"
-              className="cta-btn primary"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              Explore Products
-            </motion.a>
-            <motion.a
-              href="/contact"
-              className="cta-btn secondary"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              Get in Touch
-            </motion.a>
+            <Link to="/products" className="cta-btn primary">Explore Products</Link>
+            <Link to="/contact" className="cta-btn secondary">Get in Touch</Link>
           </div>
         </div>
       </motion.section>

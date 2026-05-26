@@ -1,461 +1,241 @@
-import React, { useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useMemo } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { FiHeart, FiShoppingCart, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
+import { FiHeart, FiShoppingBag, FiCheck } from 'react-icons/fi'
 import { useProducts } from '../hooks/useProducts'
 import { useCart } from '../hooks/useCart'
 import { useFavorites } from '../hooks/useFavorites'
+import { useFlyToCart } from '../components/FlyToCart'
 import './Favorites.css'
 
-// Static product data for fallback
-const STATIC_PRODUCTS_FAVORITES = [
-  {
-    id: 1,
-    name: 'Cozy Winter Scarf',
-    category: 'scarves',
-    price: 45,
-    images: [
-      'https://images.unsplash.com/photo-1520903920243-00d872a2d1c9?w=400',
-      'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=400',
-      'https://images.unsplash.com/photo-1606400082777-ef05f3c5cde7?w=400'
-    ],
-    description: 'Handmade with love and extra warmth. Perfect for chilly winter days.',
-    colors: ['#FFB6C1', '#E6E6FA', '#FFE4B5'],
-    difficulty: 'beginner'
-  },
-  {
-    id: 2,
-    name: 'Classic Cardigan',
-    category: 'sweaters',
-    price: 120,
-    images: [
-      'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=400',
-      'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=400',
-      'https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?w=400'
-    ],
-    description: 'Nani\'s signature design, passed down generations. A timeless classic.',
-    colors: ['#DEB887', '#F5DEB3', '#D2691E'],
-    difficulty: 'advanced'
-  },
-  {
-    id: 3,
-    name: 'Chunky Beanie',
-    category: 'hats',
-    price: 35,
-    images: [
-      'https://images.unsplash.com/photo-1576871337622-98d48d1cf531?w=400',
-      'https://images.unsplash.com/photo-1533642310407-f985136ea0b1?w=400',
-      'https://images.unsplash.com/photo-1521369909029-2afed882baee?w=400'
-    ],
-    description: 'Perfect for cold mornings and warm hearts. Keeps you cozy all day.',
-    colors: ['#B0E0E6', '#F0E68C', '#DDA0DD'],
-    difficulty: 'beginner'
-  },
-  {
-    id: 4,
-    name: 'Wool Mittens Pair',
-    category: 'gloves',
-    price: 40,
-    images: [
-      'https://images.unsplash.com/photo-1606400082777-ef05f3c5cde7?w=400',
-      'https://images.unsplash.com/photo-1544923408-75c5cef46f14?w=400',
-      'https://images.unsplash.com/photo-1610979402004-dbf5eca5cbbf?w=400'
-    ],
-    description: 'Connected with string so you never lose them. Made from premium wool.',
-    colors: ['#FF6347', '#98FB98', '#87CEEB'],
-    difficulty: 'intermediate'
-  },
-  {
-    id: 5,
-    name: 'Granny Square Blanket',
-    category: 'blankets',
-    price: 180,
-    images: [
-      'https://images.unsplash.com/photo-1584100936595-c0654b55a2e2?w=400',
-      'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400',
-      'https://images.unsplash.com/photo-1631889993959-41b4e9c6e3c5?w=400'
-    ],
-    description: 'The coziest hug you\'ll ever receive. Hand-stitched with care.',
-    colors: ['#FFB6C1', '#DDA0DD', '#F0E68C', '#98FB98'],
-    difficulty: 'advanced'
-  },
-  {
-    id: 6,
-    name: 'Tea Cozy Set',
-    category: 'accessories',
-    price: 28,
-    images: [
-      'https://images.unsplash.com/photo-1564890369478-c89ca6d9cde9?w=400',
-      'https://images.unsplash.com/photo-1556911220-bff31c812dba?w=400',
-      'https://images.unsplash.com/photo-1588195538326-c5b1e5b43ce5?w=400'
-    ],
-    description: 'Keep your tea warm while you knit. Comes with matching coasters.',
-    colors: ['#FFE4B5', '#DEB887', '#F5DEB3'],
-    difficulty: 'beginner'
-  },
-  {
-    id: 7,
-    name: 'Cable Knit Sweater',
-    category: 'sweaters',
-    price: 140,
-    images: [
-      'https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=400',
-      'https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?w=400',
-      'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=400'
-    ],
-    description: 'Intricate cables that tell a story. A masterpiece of knitting.',
-    colors: ['#F5F5DC', '#E6E6FA', '#FFE4E1'],
-    difficulty: 'advanced'
-  },
-  {
-    id: 8,
-    name: 'Cozy Socks',
-    category: 'socks',
-    price: 22,
-    images: [
-      'https://images.unsplash.com/photo-1586350977771-b3b0abd50c82?w=400',
-      'https://images.unsplash.com/photo-1580655653885-65763b2597d0?w=400',
-      'https://images.unsplash.com/photo-1575407686532-f4a37ecb6b56?w=400'
-    ],
-    description: 'Like walking on clouds made of love. Super soft and comfortable.',
-    colors: ['#FFB6C1', '#98FB98', '#87CEEB'],
-    difficulty: 'intermediate'
-  },
-  {
-    id: 9,
-    name: 'Striped Scarf',
-    category: 'scarves',
-    price: 50,
-    images: [
-      'https://images.unsplash.com/photo-1610628785958-603ebe9eae9a?w=400',
-      'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=400',
-      'https://images.unsplash.com/photo-1520903920243-00d872a2d1c9?w=400'
-    ],
-    description: 'Rainbow stripes to brighten your day. Made with vibrant colors.',
-    colors: ['#FF6347', '#FFD700', '#98FB98', '#87CEEB', '#DDA0DD'],
-    difficulty: 'intermediate'
-  },
-  {
-    id: 10,
-    name: 'Knit Pillow Cover',
-    category: 'accessories',
-    price: 38,
-    images: [
-      'https://images.unsplash.com/photo-1584100936595-c0654b55a2e2?w=400',
-      'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=400',
-      'https://images.unsplash.com/photo-1556228453-efd6c1ff04f6?w=400'
-    ],
-    description: 'Add warmth to your living space. Beautifully textured design.',
-    colors: ['#DEB887', '#F5DEB3', '#E6E6FA'],
-    difficulty: 'beginner'
-  },
-  {
-    id: 11,
-    name: 'Baby Booties',
-    category: 'baby',
-    price: 25,
-    images: [
-      'https://images.unsplash.com/photo-1519238263530-99bdd11df2ea?w=400',
-      'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=400',
-      'https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=400'
-    ],
-    description: 'Tiny treasures for tiny feet. Soft and gentle on baby\'s skin.',
-    colors: ['#FFB6C1', '#B0E0E6', '#F0E68C'],
-    difficulty: 'beginner'
-  },
-  {
-    id: 12,
-    name: 'Pom-Pom Hat',
-    category: 'hats',
-    price: 42,
-    images: [
-      'https://images.unsplash.com/photo-1576871337622-98d48d1cf531?w=400',
-      'https://images.unsplash.com/photo-1514327605112-b887c0e61c0a?w=400',
-      'https://images.unsplash.com/photo-1521369909029-2afed882baee?w=400'
-    ],
-    description: 'Extra bouncy pom-pom on top. Fun and fashionable for all ages.',
-    colors: ['#FF6347', '#DDA0DD', '#98FB98'],
-    difficulty: 'intermediate'
-  }
-]
-
-const FavoriteCard = ({ product, addToCart, toggleFavorite, cartItem }) => {
+/* ─── Favorite Card (reuses Products page card pattern) ─── */
+const FavoriteCard = ({ product, addToCart, toggleFavorite, index }) => {
   const navigate = useNavigate()
-  const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [isHovered, setIsHovered] = React.useState(false)
+  const [justAdded, setJustAdded] = React.useState(false)
+  const imageRef = React.useRef(null)
+  const { fly } = useFlyToCart()
 
-  const isInCart = cartItem !== undefined
-  const quantity = cartItem?.quantity || 1
-
-  const nextImage = (e) => {
-    e.stopPropagation()
-    setCurrentImageIndex((prev) => (prev + 1) % product.images.length)
-  }
-
-  const prevImage = (e) => {
-    e.stopPropagation()
-    setCurrentImageIndex((prev) =>
-      prev === 0 ? product.images.length - 1 : prev - 1
-    )
-  }
-
-  const incrementQuantity = (e) => {
-    e.stopPropagation()
-    const newQuantity = quantity + 1
-    addToCart({ ...product, quantity: newQuantity })
-  }
-
-  const decrementQuantity = (e) => {
-    e.stopPropagation()
-    const newQuantity = quantity - 1
-    if (newQuantity > 0) {
-      addToCart({ ...product, quantity: newQuantity })
-    }
-  }
+  const addedSize = product.sizes?.[0] || 'S'
+  const addedColor = product.colors?.[0]
 
   const handleAddToCart = (e) => {
     e.stopPropagation()
-    addToCart({ ...product, quantity: 1 })
+    if (justAdded) return
+    if (imageRef.current) {
+      const rect = imageRef.current.getBoundingClientRect()
+      fly(product.images[0], rect)
+    }
+    addToCart({
+      ...product,
+      quantity: 1,
+      selectedColor: addedColor,
+      selectedSize: addedSize
+    })
+    setJustAdded(true)
+    setTimeout(() => setJustAdded(false), 2000)
   }
 
-  const handleCardClick = () => {
-    navigate(`/product/${product.id}`)
-  }
-
-  const handleRemoveFavorite = (e) => {
-    e.stopPropagation()
-    toggleFavorite(product.id)
-  }
+  const isOutOfStock = product.stock_quantity === 0
 
   return (
-    <motion.div
-      className="favorite-card"
+    <motion.article
+      className={`fav-card${isOutOfStock ? ' fav-card--oos' : ''}`}
       layout
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.8 }}
-      transition={{ duration: 0.4 }}
-      whileHover={{ y: -10 }}
-      onClick={handleCardClick}
-      style={{ cursor: "pointer" }}
+      initial={{ opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.35, delay: index * 0.05, ease: [0.16, 1, 0.3, 1] }}
+      onClick={() => navigate(`/product/${product.id}`)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Remove from Favorites button */}
-      <motion.button
-        className="remove-favorite-btn active"
-        onClick={handleRemoveFavorite}
-        whileHover={{ scale: 1.2 }}
-        whileTap={{ scale: 0.9 }}
-      >
-        <FiHeart />
-      </motion.button>
-
-      {/* Image Carousel */}
-      <div className="favorite-image-carousel">
+      {/* Image */}
+      <div className="fav-card__image-wrap">
         <img
-          src={product.images[currentImageIndex]}
+          ref={imageRef}
+          src={product.images[0]}
           alt={product.name}
-          className="favorite-image"
+          className="fav-card__img fav-card__img--primary"
+          loading="lazy"
         />
-
-        {/* Carousel Controls */}
         {product.images.length > 1 && (
-          <>
-            <button className="carousel-btn prev-btn" onClick={prevImage}>
-              <FiChevronLeft />
-            </button>
-            <button className="carousel-btn next-btn" onClick={nextImage}>
-              <FiChevronRight />
-            </button>
+          <img
+            src={product.images[1]}
+            alt={`${product.name} alternate`}
+            className={`fav-card__img fav-card__img--secondary${isHovered ? ' visible' : ''}`}
+            loading="lazy"
+          />
+        )}
 
-            {/* Carousel Indicators */}
-            <div className="carousel-indicators">
-              {product.images.map((_, index) => (
-                <span
-                  key={index}
-                  className={`indicator ${
-                    index === currentImageIndex ? "active" : ""
-                  }`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setCurrentImageIndex(index);
-                  }}
-                />
-              ))}
-            </div>
-          </>
+        {/* Remove from favorites */}
+        <motion.button
+          className="fav-card__remove"
+          onClick={(e) => { e.stopPropagation(); toggleFavorite(product.id) }}
+          whileTap={{ scale: 0.85 }}
+        >
+          <FiHeart />
+        </motion.button>
+
+        {/* Sold Out */}
+        {isOutOfStock && (
+          <div className="fav-card__oos-overlay"><span>Sold Out</span></div>
+        )}
+
+        {/* Add to Bag */}
+        {!isOutOfStock && (
+          <motion.button
+            className={`fav-card__add-bag${justAdded ? ' fav-card__add-bag--added' : ''}`}
+            onClick={handleAddToCart}
+            initial={false}
+            animate={{ y: isHovered || justAdded ? 0 : '100%', opacity: isHovered || justAdded ? 1 : 0 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+          >
+            {justAdded ? (
+              <>
+                <FiCheck />
+                <span>Added — {addedSize}</span>
+                {addedColor && <span className="fav-card__added-dot" style={{ backgroundColor: addedColor }} />}
+              </>
+            ) : (
+              <>
+                <FiShoppingBag />
+                <span>Add to Bag</span>
+              </>
+            )}
+          </motion.button>
         )}
       </div>
 
-      {/* Product Info */}
-      <div className="favorite-info">
-        <h3 className="favorite-name">{product.name}</h3>
-        <p className="favorite-description">{product.description}</p>
-
-        {/* Color palette */}
-        <div className="favorite-colors">
-          {product.colors.map((color, i) => (
-            <motion.span
-              key={i}
-              className="color-dot"
-              style={{ backgroundColor: color }}
-              whileHover={{ scale: 1.3 }}
-            />
-          ))}
-        </div>
-
-        <div className="favorite-meta">
-          <span className="category-badge">{product.category}</span>
-        </div>
-
-        <div className="favorite-footer">
-          <span className="favorite-price">${product.price}</span>
-
-          {/* Show Add to Cart button OR Quantity Controls */}
-          {!isInCart ? (
-            <motion.button
-              className="add-to-cart-btn-fav"
-              onClick={handleAddToCart}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <FiShoppingCart /> Add to Cart
-            </motion.button>
-          ) : (
-            <div
-              className="quantity-selector-fav"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <motion.button
-                className="quantity-btn"
-                onClick={decrementQuantity}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-              >
-                -
-              </motion.button>
-              <span className="quantity-value">{quantity}</span>
-              <motion.button
-                className="quantity-btn"
-                onClick={incrementQuantity}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-              >
-                +
-              </motion.button>
+      {/* Info */}
+      <div className="fav-card__info">
+        <span className="fav-card__category">{product.category}</span>
+        <h3 className="fav-card__name">{product.name}</h3>
+        <div className="fav-card__row">
+          <span className="fav-card__price">&#8377;{product.price}</span>
+          {product.colors && product.colors.length > 0 && (
+            <div className="fav-card__colors">
+              {product.colors.slice(0, 4).map((color, i) => (
+                <span key={i} className="fav-card__dot" style={{ backgroundColor: color }} />
+              ))}
+              {product.colors.length > 4 && (
+                <span className="fav-card__dot-more">+{product.colors.length - 4}</span>
+              )}
             </div>
           )}
         </div>
       </div>
-    </motion.div>
-  );
+    </motion.article>
+  )
 }
 
+/* ─── Favorites Page ─── */
 const Favorites = () => {
   const navigate = useNavigate()
-
-  // Use context hooks
   const { products, loading: productsLoading } = useProducts()
-  const { addToCart, getCartItem } = useCart()
+  const { addToCart } = useCart()
   const { favorites, toggleFavorite } = useFavorites()
 
-  // Memoize favorite products from Supabase (with fallback)
   const favoriteProducts = useMemo(() => {
-    const allProducts = products.length > 0 ? products : STATIC_PRODUCTS_FAVORITES
-    return allProducts.filter(product => favorites.includes(product.id))
+    return products.filter(product => favorites.includes(product.id))
   }, [products, favorites])
 
-  // Debug logging
-  React.useEffect(() => {
-    console.log('Favorites page - Products:', products)
-    console.log('Favorites page - Favorites IDs:', favorites)
-    console.log('Favorites page - Favorite Products:', favoriteProducts)
-  }, [products, favorites, favoriteProducts])
-
-  // Show loading state
   if (productsLoading) {
     return (
-      <div className="favorites-page">
-        <div className="favorites-container">
-          <h2>Loading favorites from Supabase...</h2>
+      <div className="fav-page">
+        <div className="fav-hero">
+          <div className="fav-hero__inner">
+            <div className="skeleton" style={{ height: 20, width: 100, marginBottom: 20 }} />
+            <div className="skeleton" style={{ height: 40, width: 240, marginBottom: 12 }} />
+            <div className="skeleton" style={{ height: 18, width: 200 }} />
+          </div>
+        </div>
+        <div className="fav-grid-wrap">
+          <div className="fav-grid">
+            {[0,1,2].map(i => (
+              <div key={i} className="fav-card">
+                <div className="skeleton" style={{ height: 300, borderRadius: '12px 12px 0 0' }} />
+                <div style={{ padding: '16px' }}>
+                  <div className="skeleton" style={{ height: 12, width: 50, marginBottom: 8 }} />
+                  <div className="skeleton" style={{ height: 16, width: '70%', marginBottom: 8 }} />
+                  <div className="skeleton" style={{ height: 16, width: 60 }} />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="favorites-page">
-      {/* Hero Section */}
+    <div className="fav-page">
+      {/* Hero */}
       <motion.section
-        className="favorites-hero"
+        className="fav-hero"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 0.8 }}
+        transition={{ duration: 0.5 }}
       >
-        <div className="favorites-hero-content">
-          <motion.div
-            initial={{ y: 30, opacity: 0 }}
+        <div className="fav-hero__inner">
+          <nav className="fav-breadcrumb">
+            <Link to="/">Home</Link>
+            <span>/</span>
+            <span className="fav-breadcrumb__current">Wishlist</span>
+          </nav>
+
+          <motion.h1
+            className="fav-hero__title"
+            initial={{ y: 16, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.2, duration: 0.6 }}
+            transition={{ delay: 0.1, duration: 0.4 }}
           >
-            <h1 className="favorites-title">
-              <FiHeart className="heart-icon" />
-              My Favorites
-            </h1>
-            <p className="favorites-subtitle">
-              Your handpicked collection of cozy treasures
-            </p>
-          </motion.div>
+            Your Wishlist
+          </motion.h1>
+
+          <motion.p
+            className="fav-hero__subtitle"
+            initial={{ y: 12, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.2, duration: 0.4 }}
+          >
+            Pieces you've been dreaming about
+          </motion.p>
+
+          <div className="fav-hero__stitch" />
         </div>
       </motion.section>
 
-      <div className="favorites-container">
+      {/* Content */}
+      <div className="fav-grid-wrap">
         {favoriteProducts.length === 0 ? (
           <motion.div
-            className="empty-favorites"
+            className="fav-empty"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            <motion.div
-              className="empty-heart-icon"
-              animate={{
-                scale: [1, 1.1, 1],
-              }}
-              transition={{
-                duration: 2,
-                repeat: Infinity,
-                ease: "easeInOut"
-              }}
-            >
-              💝
-            </motion.div>
-            <h2>No favorites yet</h2>
-            <p>Start adding items you love to your wishlist!</p>
-            <motion.button
-              className="browse-products-btn"
-              onClick={() => navigate('/products')}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              Browse Products
-            </motion.button>
+            <div className="fav-empty__icon"><FiHeart /></div>
+            <h3>Nothing saved yet</h3>
+            <p>Tap the heart on any product to save it here.</p>
+            <button className="fav-empty__btn" onClick={() => navigate('/products')}>
+              Browse Collection
+            </button>
           </motion.div>
         ) : (
           <>
-            <div className="favorites-count">
-              <span>{favoriteProducts.length} item{favoriteProducts.length !== 1 ? 's' : ''} in your wishlist</span>
+            <div className="fav-count">
+              {favoriteProducts.length} piece{favoriteProducts.length !== 1 ? 's' : ''} saved
             </div>
 
-            <motion.div
-              className="favorites-grid"
-              layout
-            >
+            <motion.div className="fav-grid" layout>
               <AnimatePresence mode="popLayout">
-                {favoriteProducts.map((product) => (
+                {favoriteProducts.map((product, index) => (
                   <FavoriteCard
                     key={product.id}
                     product={product}
                     addToCart={addToCart}
                     toggleFavorite={toggleFavorite}
-                    cartItem={getCartItem(product.id)}
+                    index={index}
                   />
                 ))}
               </AnimatePresence>

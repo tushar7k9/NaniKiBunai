@@ -1,10 +1,24 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { FiPackage, FiTruck, FiCheckCircle, FiXCircle, FiClock, FiArrowLeft } from 'react-icons/fi'
+import { useNavigate, Link } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
+import { FiPackage, FiTruck, FiCheckCircle, FiXCircle, FiClock, FiChevronDown } from 'react-icons/fi'
 import { useAuth } from '../hooks/useAuth'
 import { orderService } from '../services/orderService'
 import './Orders.css'
+
+const statusConfig = {
+  pending:    { icon: FiClock,       label: 'Pending',    color: 'var(--terracotta)' },
+  confirmed:  { icon: FiClock,       label: 'Confirmed',  color: 'var(--terracotta)' },
+  processing: { icon: FiPackage,     label: 'Processing', color: 'var(--soft-brown)' },
+  shipped:    { icon: FiTruck,       label: 'Shipped',    color: 'var(--deep-brown)' },
+  delivered:  { icon: FiCheckCircle, label: 'Delivered',  color: '#2d8659' },
+  completed:  { icon: FiCheckCircle, label: 'Completed',  color: '#2d8659' },
+  cancelled:  { icon: FiXCircle,     label: 'Cancelled',  color: '#c0392b' },
+  refunded:   { icon: FiXCircle,     label: 'Refunded',   color: '#c0392b' },
+}
+
+const formatDate = (dateString) =>
+  new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 
 const Orders = () => {
   const navigate = useNavigate()
@@ -12,314 +26,268 @@ const Orders = () => {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [selectedOrder, setSelectedOrder] = useState(null)
+  const [expandedId, setExpandedId] = useState(null)
 
   useEffect(() => {
-    // Wait for auth to finish loading before checking authentication
     if (authLoading) return
-
-    if (!isAuthenticated) {
-      navigate('/login')
-      return
-    }
-
+    if (!isAuthenticated) { navigate('/login'); return }
     fetchOrders()
     linkGuestOrders()
   }, [isAuthenticated, authLoading])
 
   const linkGuestOrders = async () => {
     try {
-      if (user && user.email) {
-        // Try to link any guest orders with this email to the user account
-        await orderService.linkGuestOrdersToUser(user.email, user.id)
-      }
-    } catch (err) {
-      console.error('Error linking guest orders:', err)
-      // Don't show error to user, just log it
-    }
+      if (user?.email) await orderService.linkGuestOrdersToUser(user.email, user.id)
+    } catch (err) { console.error('Error linking guest orders:', err) }
   }
 
   const fetchOrders = async () => {
     try {
       setLoading(true)
-      // Fetch orders including guest orders with same email
       const userOrders = await orderService.getUserOrders(null, { includeGuestOrders: true })
       setOrders(userOrders)
     } catch (err) {
       console.error('Error fetching orders:', err)
-      setError('Failed to load orders. Please try again.')
-    } finally {
-      setLoading(false)
-    }
+      setError('Failed to load orders.')
+    } finally { setLoading(false) }
   }
 
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'pending':
-      case 'confirmed':
-        return <FiClock className="status-icon pending" />
-      case 'processing':
-      case 'shipped':
-        return <FiTruck className="status-icon processing" />
-      case 'delivered':
-      case 'completed':
-        return <FiCheckCircle className="status-icon completed" />
-      case 'cancelled':
-      case 'refunded':
-        return <FiXCircle className="status-icon cancelled" />
-      default:
-        return <FiPackage className="status-icon" />
-    }
-  }
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'pending':
-      case 'confirmed':
-        return '#f59e0b'
-      case 'processing':
-      case 'shipped':
-        return '#3b82f6'
-      case 'delivered':
-      case 'completed':
-        return '#10b981'
-      case 'cancelled':
-      case 'refunded':
-        return '#ef4444'
-      default:
-        return '#6b7280'
-    }
-  }
-
-  const formatDate = (dateString) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    })
-  }
-
+  // Loading
   if (loading) {
     return (
-      <div className="orders-page">
-        <div className="loading-container">
-          <motion.div
-            className="loading-spinner"
-            animate={{ rotate: 360 }}
-            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-          >
-            <FiPackage size={48} />
-          </motion.div>
-          <p>Loading your orders...</p>
+      <div className="ord-page">
+        <div className="ord-hero">
+          <div className="ord-hero__inner">
+            <div className="skeleton" style={{ height: 20, width: 100, marginBottom: 20 }} />
+            <div className="skeleton" style={{ height: 40, width: 200, marginBottom: 12 }} />
+            <div className="skeleton" style={{ height: 18, width: 260 }} />
+          </div>
+        </div>
+        <div className="ord-content">
+          {[0,1,2].map(i => (
+            <div key={i} className="skeleton" style={{ height: 120, borderRadius: 12, marginBottom: 12 }} />
+          ))}
         </div>
       </div>
     )
   }
 
+  // Error
   if (error) {
     return (
-      <div className="orders-page">
-        <div className="error-container">
-          <FiXCircle size={48} color="#ef4444" />
-          <h2>Error</h2>
+      <div className="ord-page">
+        <div className="ord-empty">
+          <div className="ord-empty__icon"><FiXCircle /></div>
+          <h3>Something went wrong</h3>
           <p>{error}</p>
-          <motion.button
-            className="retry-btn"
-            onClick={fetchOrders}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            Try Again
-          </motion.button>
+          <button className="ord-empty__btn" onClick={fetchOrders}>Try Again</button>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="orders-page">
-      <motion.button
-        className="back-button"
-        onClick={() => navigate(-1)}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
+    <div className="ord-page">
+      {/* Hero */}
+      <motion.section
+        className="ord-hero"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5 }}
       >
-        <FiArrowLeft /> Back
-      </motion.button>
+        <div className="ord-hero__inner">
+          <nav className="ord-breadcrumb">
+            <Link to="/">Home</Link>
+            <span>/</span>
+            <span className="ord-breadcrumb__current">Orders</span>
+          </nav>
 
-      <div className="orders-container">
-        <motion.div
-          className="orders-header"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <h1>My Orders</h1>
-          <p>View and track your order history</p>
-        </motion.div>
+          <motion.h1
+            className="ord-hero__title"
+            initial={{ y: 16, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.1, duration: 0.4 }}
+          >
+            My Orders
+          </motion.h1>
 
+          <motion.p
+            className="ord-hero__subtitle"
+            initial={{ y: 12, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.2, duration: 0.4 }}
+          >
+            Track your handcrafted pieces
+          </motion.p>
+
+          <div className="ord-hero__stitch" />
+        </div>
+      </motion.section>
+
+      {/* Content */}
+      <div className="ord-content">
         {orders.length === 0 ? (
           <motion.div
-            className="empty-orders"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
+            className="ord-empty"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
           >
-            <FiPackage size={64} />
-            <h2>No orders yet</h2>
-            <p>Start shopping to see your orders here</p>
-            <motion.button
-              className="shop-now-btn"
-              onClick={() => navigate('/products')}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              Shop Now
-            </motion.button>
+            <div className="ord-empty__icon"><FiPackage /></div>
+            <h3>No orders yet</h3>
+            <p>Your handcrafted journey starts here.</p>
+            <button className="ord-empty__btn" onClick={() => navigate('/products')}>
+              Browse Collection
+            </button>
           </motion.div>
         ) : (
-          <div className="orders-list">
-            {orders.map((order, index) => (
-              <motion.div
-                key={order.id}
-                className="order-card"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                onClick={() => setSelectedOrder(selectedOrder?.id === order.id ? null : order)}
-              >
-                <div className="order-card-header">
-                  <div className="order-info">
-                    <h3>Order #{order.order_number}</h3>
-                    <p className="order-date">{formatDate(order.created_at)}</p>
-                  </div>
-                  <div className="order-status" style={{ color: getStatusColor(order.status) }}>
-                    {getStatusIcon(order.status)}
-                    <span>{order.status.charAt(0).toUpperCase() + order.status.slice(1)}</span>
-                  </div>
-                </div>
+          <div className="ord-list">
+            {orders.map((order, index) => {
+              const status = statusConfig[order.status] || statusConfig.pending
+              const StatusIcon = status.icon
+              const isExpanded = expandedId === order.id
 
-                <div className="order-summary">
-                  <div className="order-items-preview">
-                    {order.items?.slice(0, 3).map((item, idx) => (
-                      <img
-                        key={idx}
-                        src={item.product_snapshot?.images?.[0] || '/placeholder.png'}
-                        alt={item.product_snapshot?.name || 'Product'}
-                        className="order-item-thumbnail"
-                      />
-                    ))}
-                    {order.items?.length > 3 && (
-                      <div className="more-items">+{order.items.length - 3}</div>
-                    )}
-                  </div>
-                  <div className="order-total">
-                    <span>Total:</span>
-                    <strong>${parseFloat(order.total_amount).toFixed(2)}</strong>
-                  </div>
-                </div>
-
-                {selectedOrder?.id === order.id && (
-                  <motion.div
-                    className="order-details"
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
+              return (
+                <motion.div
+                  key={order.id}
+                  className="ord-card"
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.06, duration: 0.35 }}
+                >
+                  {/* Card Header — always visible */}
+                  <button
+                    className="ord-card__header"
+                    onClick={() => setExpandedId(isExpanded ? null : order.id)}
                   >
-                    <div className="order-details-section">
-                      <h4>Items</h4>
-                      {order.items?.map((item, idx) => (
-                        <div key={idx} className="order-item-detail">
+                    <div className="ord-card__left">
+                      {/* Item thumbnails */}
+                      <div className="ord-card__thumbs">
+                        {order.items?.slice(0, 3).map((item, idx) => (
                           <img
+                            key={idx}
                             src={item.product_snapshot?.images?.[0] || '/placeholder.png'}
-                            alt={item.product_snapshot?.name || 'Product'}
+                            alt=""
+                            className="ord-card__thumb"
                           />
-                          <div className="item-info">
-                            <p className="item-name">{item.product_snapshot?.name}</p>
-                            <p className="item-quantity">Qty: {item.quantity}</p>
-                            {item.selected_color && (
-                              <p className="item-variant">
-                                <span
-                                  className="color-dot"
-                                  style={{ backgroundColor: item.selected_color }}
-                                />
-                                {item.selected_size}
-                              </p>
-                            )}
-                            {item.product_snapshot?.customer_instructions && (
-                              <p className="item-instructions">
-                                Note: {item.product_snapshot.customer_instructions}
-                              </p>
-                            )}
-                          </div>
-                          <div className="item-price">
-                            ${parseFloat(item.total_price).toFixed(2)}
-                          </div>
+                        ))}
+                        {order.items?.length > 3 && (
+                          <span className="ord-card__thumb-more">+{order.items.length - 3}</span>
+                        )}
+                      </div>
+
+                      <div className="ord-card__meta">
+                        <span className="ord-card__number">#{order.order_number}</span>
+                        <span className="ord-card__date">{formatDate(order.created_at)}</span>
+                      </div>
+                    </div>
+
+                    <div className="ord-card__right">
+                      <span className="ord-card__status" style={{ color: status.color }}>
+                        <StatusIcon /> {status.label}
+                      </span>
+                      <span className="ord-card__total">&#8377;{parseFloat(order.total_amount).toFixed(0)}</span>
+                      <FiChevronDown className={`ord-card__chevron${isExpanded ? ' open' : ''}`} />
+                    </div>
+                  </button>
+
+                  {/* Expanded Details */}
+                  <div className={`ord-details${isExpanded ? ' open' : ''}`}>
+                    <div className="ord-details__inner">
+                      {/* Items */}
+                      <div className="ord-details__section">
+                        <h4 className="ord-details__label">Items</h4>
+                        <div className="ord-details__items">
+                          {order.items?.map((item, idx) => (
+                            <div key={idx} className="ord-item">
+                              <img
+                                src={item.product_snapshot?.images?.[0] || '/placeholder.png'}
+                                alt={item.product_snapshot?.name || 'Product'}
+                                className="ord-item__img"
+                              />
+                              <div className="ord-item__info">
+                                <span className="ord-item__name">{item.product_snapshot?.name}</span>
+                                <div className="ord-item__meta">
+                                  <span>Qty: {item.quantity}</span>
+                                  {item.selected_color && (
+                                    <span className="ord-item__dot" style={{ backgroundColor: item.selected_color }} />
+                                  )}
+                                  {item.selected_size && (
+                                    <span className="ord-item__tag">{item.selected_size}</span>
+                                  )}
+                                </div>
+                                {item.product_snapshot?.customer_instructions && (
+                                  <span className="ord-item__note">Note: {item.product_snapshot.customer_instructions}</span>
+                                )}
+                              </div>
+                              <span className="ord-item__price">&#8377;{parseFloat(item.total_price).toFixed(0)}</span>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
+                      </div>
 
-                    <div className="order-details-section">
-                      <h4>Shipping Address</h4>
-                      <div className="address">
-                        <p>
-                          {order.shipping_address.firstName} {order.shipping_address.lastName}
-                        </p>
-                        <p>{order.shipping_address.address}</p>
-                        <p>
-                          {order.shipping_address.city}, {order.shipping_address.state}{' '}
-                          {order.shipping_address.zipCode}
-                        </p>
-                        <p>{order.shipping_address.country}</p>
-                      </div>
-                    </div>
-
-                    <div className="order-details-section">
-                      <h4>Order Summary</h4>
-                      <div className="summary-row">
-                        <span>Subtotal:</span>
-                        <span>${parseFloat(order.subtotal).toFixed(2)}</span>
-                      </div>
-                      <div className="summary-row">
-                        <span>Shipping:</span>
-                        <span>${parseFloat(order.shipping_cost || 0).toFixed(2)}</span>
-                      </div>
-                      <div className="summary-row">
-                        <span>Tax:</span>
-                        <span>${parseFloat(order.tax_amount || 0).toFixed(2)}</span>
-                      </div>
-                      {order.discount_amount > 0 && (
-                        <div className="summary-row discount">
-                          <span>Discount:</span>
-                          <span>-${parseFloat(order.discount_amount).toFixed(2)}</span>
+                      {/* Shipping */}
+                      {order.shipping_address && (
+                        <div className="ord-details__section">
+                          <h4 className="ord-details__label">Shipping</h4>
+                          <p className="ord-details__text">
+                            {order.shipping_address.firstName} {order.shipping_address.lastName}<br />
+                            {order.shipping_address.address}<br />
+                            {order.shipping_address.city}, {order.shipping_address.state} {order.shipping_address.zipCode}
+                          </p>
                         </div>
                       )}
-                      <div className="summary-row total">
-                        <span>Total:</span>
-                        <strong>${parseFloat(order.total_amount).toFixed(2)}</strong>
+
+                      {/* Summary */}
+                      <div className="ord-details__section">
+                        <h4 className="ord-details__label">Summary</h4>
+                        <div className="ord-summary">
+                          <div className="ord-summary__row">
+                            <span>Subtotal</span>
+                            <span>&#8377;{parseFloat(order.subtotal).toFixed(0)}</span>
+                          </div>
+                          <div className="ord-summary__row">
+                            <span>Shipping</span>
+                            <span>&#8377;{parseFloat(order.shipping_cost || 0).toFixed(0)}</span>
+                          </div>
+                          <div className="ord-summary__row">
+                            <span>Tax</span>
+                            <span>&#8377;{parseFloat(order.tax_amount || 0).toFixed(0)}</span>
+                          </div>
+                          {order.discount_amount > 0 && (
+                            <div className="ord-summary__row ord-summary__row--discount">
+                              <span>Discount</span>
+                              <span>-&#8377;{parseFloat(order.discount_amount).toFixed(0)}</span>
+                            </div>
+                          )}
+                          <div className="ord-summary__row ord-summary__row--total">
+                            <span>Total</span>
+                            <span>&#8377;{parseFloat(order.total_amount).toFixed(0)}</span>
+                          </div>
+                        </div>
                       </div>
+
+                      {/* Tracking */}
+                      {order.tracking_number && (
+                        <div className="ord-details__section">
+                          <h4 className="ord-details__label">Tracking</h4>
+                          <p className="ord-details__text">
+                            <strong>{order.tracking_number}</strong>
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Notes */}
+                      {order.customer_notes && (
+                        <div className="ord-details__section">
+                          <h4 className="ord-details__label">Your Notes</h4>
+                          <p className="ord-details__text ord-details__text--note">{order.customer_notes}</p>
+                        </div>
+                      )}
                     </div>
-
-                    {order.tracking_number && (
-                      <div className="order-details-section">
-                        <h4>Tracking Information</h4>
-                        <p className="tracking-number">
-                          Tracking #: <strong>{order.tracking_number}</strong>
-                        </p>
-                      </div>
-                    )}
-
-                    {order.customer_notes && (
-                      <div className="order-details-section">
-                        <h4>Order Notes</h4>
-                        <p>{order.customer_notes}</p>
-                      </div>
-                    )}
-                  </motion.div>
-                )}
-              </motion.div>
-            ))}
+                  </div>
+                </motion.div>
+              )
+            })}
           </div>
         )}
       </div>

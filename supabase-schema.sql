@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS products (
   images TEXT[] DEFAULT '{}',
   description TEXT,
   colors TEXT[] DEFAULT '{}',
+  sizes TEXT[] DEFAULT ARRAY['S', 'M', 'L', 'XL', 'XXL'],
   difficulty TEXT CHECK (difficulty IN ('beginner', 'intermediate', 'advanced')),
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT now(),

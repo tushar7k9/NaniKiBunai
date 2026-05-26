@@ -1,85 +1,155 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { FiShoppingCart, FiHeart } from 'react-icons/fi'
+import { FiHeart, FiShoppingBag, FiArrowRight, FiCheck } from 'react-icons/fi'
 import { useProducts } from '../hooks/useProducts'
 import { useCart } from '../hooks/useCart'
 import { useFavorites } from '../hooks/useFavorites'
+import { useFlyToCart } from './FlyToCart'
 import './FeaturedProducts.css'
 
-// Static featured products for fallback
-const STATIC_FEATURED_PRODUCTS = [
-  {
-    id: 1,
-    name: 'Classic Wool Sweater',
-    price: 89.99,
-    image: 'sweater',
-    category: 'Sweaters',
-    description: 'Soft merino wool, handknitted with care'
-  },
-  {
-    id: 2,
-    name: 'Cozy Winter Socks',
-    price: 24.99,
-    image: 'socks',
-    category: 'Socks',
-    description: 'Warm and comfortable for cold days'
-  },
-  {
-    id: 3,
-    name: 'Elegant Cashmere Scarf',
-    price: 69.99,
-    image: 'scarf',
-    category: 'Scarves',
-    description: 'Luxurious cashmere blend'
-  },
-  {
-    id: 4,
-    name: 'Premium Knit Gloves',
-    price: 34.99,
-    image: 'gloves',
-    category: 'Gloves',
-    description: 'Touchscreen compatible wool gloves'
-  },
-  {
-    id: 5,
-    name: 'Cable Knit Cardigan',
-    price: 109.99,
-    image: 'cardigan',
-    category: 'Sweaters',
-    description: 'Traditional cable pattern, modern fit'
-  },
-  {
-    id: 6,
-    name: 'Alpaca Wool Beanie',
-    price: 39.99,
-    image: 'beanie',
-    category: 'Other',
-    description: 'Soft alpaca blend for ultimate warmth'
-  }
-]
+const FALLBACK_IMG = 'https://images.unsplash.com/photo-1520903920243-00d872a2d1c9?w=400&q=80'
+
+const SkeletonCard = () => (
+  <div className="fp-card">
+    <div className="skeleton" style={{ aspectRatio: '3/4', borderRadius: '12px 12px 0 0' }} />
+    <div style={{ padding: '18px' }}>
+      <div className="skeleton" style={{ height: 11, width: '40%', marginBottom: 8 }} />
+      <div className="skeleton" style={{ height: 16, width: '75%', marginBottom: 8 }} />
+      <div className="skeleton" style={{ height: 16, width: 50 }} />
+    </div>
+  </div>
+)
+
+/* ─── Featured Card — mirrors Products page card ─── */
+const FeaturedCard = ({ product, index, addToCart, isFavorite, toggleFavorite }) => {
+  const navigate = useNavigate()
+  const [isHovered, setIsHovered] = useState(false)
+  const [justAdded, setJustAdded] = useState(false)
+  const imageRef = useRef(null)
+  const { fly } = useFlyToCart()
+
+  const addedSize = product.sizes?.[0] || 'S'
+  const addedColor = product.colors?.[0]
+
+  const handleAddToCart = useCallback((e) => {
+    e.stopPropagation()
+    if (justAdded) return
+    if (imageRef.current) {
+      fly(product.images?.[0] || FALLBACK_IMG, imageRef.current.getBoundingClientRect())
+    }
+    addToCart({
+      ...product,
+      quantity: 1,
+      selectedColor: addedColor,
+      selectedSize: addedSize
+    })
+    setJustAdded(true)
+    setTimeout(() => setJustAdded(false), 2000)
+  }, [justAdded, product, addToCart, fly, addedColor, addedSize])
+
+  const isOutOfStock = product.stock_quantity === 0
+
+  return (
+    <motion.article
+      className={`fp-card${isOutOfStock ? ' fp-card--oos' : ''}`}
+      initial={{ opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.4, delay: index * 0.07, ease: [0.16, 1, 0.3, 1] }}
+      onClick={() => navigate(`/product/${product.id}`)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {/* Image */}
+      <div className="fp-card__image-wrap">
+        <img
+          ref={imageRef}
+          src={product.images?.[0] || FALLBACK_IMG}
+          alt={product.name}
+          className="fp-card__img fp-card__img--primary"
+          loading="lazy"
+          onError={(e) => { e.target.src = FALLBACK_IMG }}
+        />
+        {product.images?.length > 1 && (
+          <img
+            src={product.images[1]}
+            alt={`${product.name} alt`}
+            className={`fp-card__img fp-card__img--secondary${isHovered ? ' visible' : ''}`}
+            loading="lazy"
+          />
+        )}
+
+        {/* Favorite */}
+        <motion.button
+          className={`fp-card__fav${isFavorite ? ' active' : ''}`}
+          onClick={(e) => { e.stopPropagation(); toggleFavorite(product.id) }}
+          initial={false}
+          animate={{ opacity: isFavorite || isHovered ? 1 : 0 }}
+          whileTap={{ scale: 0.85 }}
+        >
+          <FiHeart />
+        </motion.button>
+
+        {/* Sold Out */}
+        {isOutOfStock && (
+          <div className="fp-card__oos"><span>Sold Out</span></div>
+        )}
+
+        {/* Add to Bag */}
+        {!isOutOfStock && (
+          <motion.button
+            className={`fp-card__add-bag${justAdded ? ' fp-card__add-bag--added' : ''}`}
+            onClick={handleAddToCart}
+            initial={false}
+            animate={{ y: isHovered || justAdded ? 0 : '100%', opacity: isHovered || justAdded ? 1 : 0 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+          >
+            {justAdded ? (
+              <>
+                <FiCheck />
+                <span>Added — {addedSize}</span>
+                {addedColor && <span className="fp-card__added-dot" style={{ backgroundColor: addedColor }} />}
+              </>
+            ) : (
+              <>
+                <FiShoppingBag />
+                <span>Add to Bag</span>
+              </>
+            )}
+          </motion.button>
+        )}
+      </div>
+
+      {/* Info */}
+      <div className="fp-card__info">
+        <span className="fp-card__category">{product.category}</span>
+        <h3 className="fp-card__name">{product.name}</h3>
+        <div className="fp-card__row">
+          <span className="fp-card__price">&#8377;{product.price}</span>
+          {product.colors && product.colors.length > 0 && (
+            <div className="fp-card__colors">
+              {product.colors.slice(0, 4).map((color, i) => (
+                <span key={i} className="fp-card__dot" style={{ backgroundColor: color }} />
+              ))}
+              {product.colors.length > 4 && (
+                <span className="fp-card__dot-more">+{product.colors.length - 4}</span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </motion.article>
+  )
+}
 
 const FeaturedProducts = () => {
   const navigate = useNavigate()
-
-  // Use context hooks
   const { products: allProducts, loading: productsLoading } = useProducts()
-  const { addToCart, getCartItem } = useCart()
+  const { addToCart } = useCart()
   const { favorites, toggleFavorite } = useFavorites()
 
-  // Get featured products (first 6 products from Supabase, or static fallback)
-  const featuredProducts = useMemo(() => {
-    if (allProducts.length > 0) {
-      return allProducts.slice(0, 6)
-    }
-    return STATIC_FEATURED_PRODUCTS
-  }, [allProducts])
-
-  // Debug logging
-  React.useEffect(() => {
-    console.log('FeaturedProducts - All Products:', allProducts)
-    console.log('FeaturedProducts - Featured Products:', featuredProducts)
-  }, [allProducts, featuredProducts])
+  const featuredProducts = useMemo(() => allProducts.slice(0, 6), [allProducts])
 
   return (
     <section className="featured-products">
@@ -91,87 +161,41 @@ const FeaturedProducts = () => {
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
         >
-          <h2>Featured Products</h2>
+          <div className="handcrafted-badge" style={{ marginBottom: 16 }}>Featured Picks</div>
+          <h2>Loved by Our Customers</h2>
           <p>Handpicked selections from our artisan collection</p>
         </motion.div>
 
-        {productsLoading ? (
-          <div className="loading-state">
-            <p>Loading featured products from Supabase...</p>
-          </div>
-        ) : (
-          <div className="products-grid">
-            {featuredProducts.map((product, index) => {
-              const isFavorite = favorites.includes(product.id)
-              const cartItem = getCartItem(product.id)
-
-              return (
-                <motion.div
+        <div className="fp-grid">
+          {productsLoading
+            ? Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
+            : featuredProducts.map((product, index) => (
+                <FeaturedCard
                   key={product.id}
-                  className="product-card"
-                  initial={{ opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                >
-                  <div className="product-image-wrapper">
-                    <div className={`product-image ${product.image || 'default'}`}>
-                      <motion.div
-                        className="product-overlay"
-                        initial={{ opacity: 0 }}
-                        whileHover={{ opacity: 1 }}
-                        transition={{ duration: 0.3 }}
-                      >
-                        <motion.button
-                          className={`icon-btn ${isFavorite ? 'active' : ''}`}
-                          onClick={() => toggleFavorite(product.id)}
-                          whileHover={{ scale: 1.1 }}
-                          whileTap={{ scale: 0.9 }}
-                        >
-                          <FiHeart />
-                        </motion.button>
-                      </motion.div>
-                    </div>
-                    <span className="product-badge">{product.category}</span>
-                  </div>
-
-                  <div className="product-info">
-                    <h3>{product.name}</h3>
-                    <p className="product-description">{product.description}</p>
-                    <div className="product-footer">
-                      <span className="product-price">${product.price}</span>
-                      <motion.button
-                        className="add-to-cart-btn"
-                        onClick={() => addToCart({ ...product, quantity: 1 })}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                      >
-                        <FiShoppingCart />
-                        Add to Cart
-                      </motion.button>
-                    </div>
-                  </div>
-                </motion.div>
-              )
-            })}
-          </div>
-        )}
-
+                  product={product}
+                  index={index}
+                  addToCart={addToCart}
+                  isFavorite={favorites.includes(product.id)}
+                  toggleFavorite={toggleFavorite}
+                />
+              ))
+          }
+        </div>
 
         <motion.div
-          className="view-all-container"
+          className="fp-view-all"
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.4 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
         >
           <motion.button
-            className="btn-primary"
+            className="fp-view-all__btn"
             onClick={() => navigate('/products')}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
           >
-            View All Products
+            View All Products <FiArrowRight />
           </motion.button>
         </motion.div>
       </div>
