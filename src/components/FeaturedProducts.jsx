@@ -22,11 +22,11 @@ const SkeletonCard = () => (
 )
 
 /* ─── Featured Card — mirrors Products page card ─── */
-const isTouchDevice = window.matchMedia('(hover: none)').matches
+const isTouchDevice = typeof window !== 'undefined' && ('ontouchstart' in window || window.matchMedia('(hover: none)').matches)
 
 const FeaturedCard = ({ product, index, addToCart, isFavorite, toggleFavorite }) => {
   const navigate = useNavigate()
-  const [isHovered, setIsHovered] = useState(isTouchDevice)
+  const [isHovered, setIsHovered] = useState(false)
   const [justAdded, setJustAdded] = useState(false)
   const imageRef = useRef(null)
   const { fly } = useFlyToCart()
@@ -87,7 +87,7 @@ const FeaturedCard = ({ product, index, addToCart, isFavorite, toggleFavorite })
           className={`fp-card__fav${isFavorite ? ' active' : ''}`}
           onClick={(e) => { e.stopPropagation(); toggleFavorite(product.id) }}
           initial={false}
-          animate={{ opacity: isFavorite || isHovered ? 1 : 0 }}
+          animate={{ opacity: isFavorite || isHovered || isTouchDevice ? 1 : 0 }}
           whileTap={{ scale: 0.85 }}
         >
           <FiHeart />
@@ -100,26 +100,46 @@ const FeaturedCard = ({ product, index, addToCart, isFavorite, toggleFavorite })
 
         {/* Add to Bag */}
         {!isOutOfStock && (
-          <motion.button
-            className={`fp-card__add-bag${justAdded ? ' fp-card__add-bag--added' : ''}`}
-            onClick={handleAddToCart}
-            initial={false}
-            animate={{ y: isHovered || justAdded ? 0 : '100%', opacity: isHovered || justAdded ? 1 : 0 }}
-            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-          >
-            {justAdded ? (
-              <>
-                <FiCheck />
-                <span>Added — {addedSize}</span>
-                {addedColor && <span className="fp-card__added-dot" style={{ backgroundColor: addedColor }} />}
-              </>
-            ) : (
-              <>
-                <FiShoppingBag />
-                <span>Add to Bag</span>
-              </>
-            )}
-          </motion.button>
+          isTouchDevice ? (
+            <button
+              className={`fp-card__add-bag fp-card__add-bag--touch${justAdded ? ' fp-card__add-bag--added' : ''}`}
+              onClick={handleAddToCart}
+            >
+              {justAdded ? (
+                <>
+                  <FiCheck />
+                  <span>Added — {addedSize}</span>
+                  {addedColor && <span className="fp-card__added-dot" style={{ backgroundColor: addedColor }} />}
+                </>
+              ) : (
+                <>
+                  <FiShoppingBag />
+                  <span>Add to Bag</span>
+                </>
+              )}
+            </button>
+          ) : (
+            <motion.button
+              className={`fp-card__add-bag${justAdded ? ' fp-card__add-bag--added' : ''}`}
+              onClick={handleAddToCart}
+              initial={false}
+              animate={{ y: isHovered || justAdded ? 0 : '100%', opacity: isHovered || justAdded ? 1 : 0 }}
+              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            >
+              {justAdded ? (
+                <>
+                  <FiCheck />
+                  <span>Added — {addedSize}</span>
+                  {addedColor && <span className="fp-card__added-dot" style={{ backgroundColor: addedColor }} />}
+                </>
+              ) : (
+                <>
+                  <FiShoppingBag />
+                  <span>Add to Bag</span>
+                </>
+              )}
+            </motion.button>
+          )
         )}
       </div>
 

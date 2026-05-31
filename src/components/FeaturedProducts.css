@@ -136,6 +136,14 @@
 
 .fp-card__add-bag:hover { background: rgba(196, 137, 106, 0.95); }
 
+.fp-card__add-bag--touch {
+  position: relative;
+  opacity: 1;
+  transform: none;
+  background: var(--deep-brown);
+  border-radius: 0;
+}
+
 /* Added confirmation state */
 .fp-card__add-bag--added {
   background: rgba(45, 134, 89, 0.92) !important;
