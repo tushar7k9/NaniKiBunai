@@ -87,9 +87,11 @@ const CategoryReveal = ({ categoryName, onComplete }) => {
 }
 
 /* ─── Product Card ─── */
+const isTouchDevice = window.matchMedia('(hover: none)').matches
+
 const ProductCard = ({ product, addToCart, isFavorite, toggleFavorite, index }) => {
   const navigate = useNavigate()
-  const [isHovered, setIsHovered] = useState(false)
+  const [isHovered, setIsHovered] = useState(isTouchDevice)
   const [selectedColor, setSelectedColor] = useState(0)
   const [selectedSize, setSelectedSize] = useState(product.sizes?.[0] || 'S')
   const [justAdded, setJustAdded] = useState(false)
@@ -137,8 +139,8 @@ const ProductCard = ({ product, addToCart, isFavorite, toggleFavorite, index }) 
         layout: { duration: 0.35, ease: [0.25, 1, 0.5, 1] }
       }}
       onClick={handleCardClick}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={() => !isTouchDevice && setIsHovered(true)}
+      onMouseLeave={() => !isTouchDevice && setIsHovered(false)}
     >
       {/* Image */}
       <div className="p-card__image-wrap">

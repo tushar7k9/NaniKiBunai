@@ -22,9 +22,11 @@ const SkeletonCard = () => (
 )
 
 /* ─── Featured Card — mirrors Products page card ─── */
+const isTouchDevice = window.matchMedia('(hover: none)').matches
+
 const FeaturedCard = ({ product, index, addToCart, isFavorite, toggleFavorite }) => {
   const navigate = useNavigate()
-  const [isHovered, setIsHovered] = useState(false)
+  const [isHovered, setIsHovered] = useState(isTouchDevice)
   const [justAdded, setJustAdded] = useState(false)
   const imageRef = useRef(null)
   const { fly } = useFlyToCart()
@@ -58,8 +60,8 @@ const FeaturedCard = ({ product, index, addToCart, isFavorite, toggleFavorite })
       viewport={{ once: true }}
       transition={{ duration: 0.4, delay: index * 0.07, ease: [0.16, 1, 0.3, 1] }}
       onClick={() => navigate(`/product/${product.id}`)}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={() => !isTouchDevice && setIsHovered(true)}
+      onMouseLeave={() => !isTouchDevice && setIsHovered(false)}
     >
       {/* Image */}
       <div className="fp-card__image-wrap">
