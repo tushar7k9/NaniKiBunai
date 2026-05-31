@@ -63,11 +63,27 @@ export const getOrderDetails = async (orderId) => {
   return data
 }
 
-export const updateOrderStatus = async (orderId, status) => {
+export const updateOrderStatus = async (orderId, status, { fromStatus, trackingNumber } = {}) => {
   const updates = { status, updated_at: new Date().toISOString() }
 
+  // Set timestamps on forward transitions
   if (status === 'shipped') updates.shipped_at = new Date().toISOString()
   if (status === 'delivered') updates.delivered_at = new Date().toISOString()
+  if (trackingNumber !== undefined) updates.tracking_number = trackingNumber
+
+  // Cleanup on backward transitions and cancellations
+  if (fromStatus === 'shipped' && status === 'processing') {
+    updates.tracking_number = null
+    updates.shipped_at = null
+  }
+  if (fromStatus === 'delivered' && status === 'shipped') {
+    updates.delivered_at = null
+  }
+  if (status === 'cancelled') {
+    updates.tracking_number = null
+    updates.shipped_at = null
+    updates.delivered_at = null
+  }
 
   const { data, error } = await supabase
     .from('orders')

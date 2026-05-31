@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { FiPackage, FiTruck, FiCheckCircle, FiXCircle, FiClock, FiChevronDown } from 'react-icons/fi'
+import {
+  FiPackage, FiTruck, FiCheckCircle, FiXCircle, FiClock,
+  FiChevronDown, FiExternalLink, FiAlertCircle,
+} from 'react-icons/fi'
 import { useAuth } from '../hooks/useAuth'
 import { orderService } from '../services/orderService'
 import './Orders.css'
 
+// ── Status config ──
 const statusConfig = {
   pending:    { icon: FiClock,       label: 'Pending',    color: 'var(--terracotta)' },
   confirmed:  { icon: FiClock,       label: 'Confirmed',  color: 'var(--terracotta)' },
@@ -17,9 +21,103 @@ const statusConfig = {
   refunded:   { icon: FiXCircle,     label: 'Refunded',   color: '#c0392b' },
 }
 
+const statusMessages = {
+  pending:    "We've received your order and will confirm it shortly.",
+  confirmed:  "Your order is confirmed! We're preparing your handcrafted piece.",
+  processing: "Your piece is being crafted with care and attention.",
+  shipped:    "Your order is on its way! Arriving soon.",
+  delivered:  "Your handcrafted piece has arrived. We hope you love it!",
+  completed:  "Thank you for being part of our handcrafted journey.",
+  cancelled:  "This order was cancelled.",
+  refunded:   "A refund has been processed for this order.",
+}
+
+const paymentStatusConfig = {
+  paid:                { label: 'Paid',               color: '#2d8659', bg: 'rgba(45, 134, 89, 0.1)' },
+  pending:             { label: 'Payment Pending',    color: '#b8860b', bg: 'rgba(184, 134, 11, 0.1)' },
+  failed:              { label: 'Payment Failed',     color: '#c0392b', bg: 'rgba(192, 57, 43, 0.1)' },
+  refunded:            { label: 'Refunded',           color: '#9A8C82', bg: 'rgba(154, 140, 130, 0.1)' },
+  partially_refunded:  { label: 'Partially Refunded', color: '#9A8C82', bg: 'rgba(154, 140, 130, 0.1)' },
+}
+
+const ORDER_STEPS = [
+  { key: 'pending',    label: 'Ordered' },
+  { key: 'confirmed',  label: 'Confirmed' },
+  { key: 'processing', label: 'Processing' },
+  { key: 'shipped',    label: 'Shipped' },
+  { key: 'delivered',  label: 'Delivered' },
+]
+
+// ── Helpers ──
 const formatDate = (dateString) =>
   new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 
+const detectCarrier = (trackingNumber) => {
+  if (!trackingNumber) return { name: null, url: null }
+  const tn = trackingNumber.trim()
+  if (/^E\w+IN$/i.test(tn))
+    return { name: 'India Post', url: 'https://www.indiapost.gov.in/_layouts/15/dop.portal.tracking/trackconsignment.aspx' }
+  if (/^DL/i.test(tn))
+    return { name: 'Delhivery', url: `https://www.delhivery.com/track/package/${tn}` }
+  if (/^\d{10,11}$/.test(tn))
+    return { name: 'BlueDart', url: `https://www.bluedart.com/tracking?tracknumbers=${tn}` }
+  if (/^D\d{8,9}$/i.test(tn))
+    return { name: 'DTDC', url: `https://www.dtdc.in/tracking/tracking_results.asp?TrkType=consignment&strCnno=${tn}` }
+  return { name: 'Courier', url: null }
+}
+
+// ── Progress Stepper ──
+const OrderProgressStepper = ({ order }) => {
+  if (['cancelled', 'refunded'].includes(order.status)) {
+    return (
+      <div className="ord-stepper ord-stepper--cancelled">
+        <div className="ord-stepper__cancelled-indicator">
+          <FiXCircle />
+          <span>{order.status === 'cancelled' ? 'Order Cancelled' : 'Order Refunded'}</span>
+        </div>
+      </div>
+    )
+  }
+
+  const currentIndex = order.status === 'completed'
+    ? 4
+    : ORDER_STEPS.findIndex(s => s.key === order.status)
+
+  const getTimestamp = (stepKey) => {
+    if (stepKey === 'pending') return order.created_at
+    if (stepKey === 'shipped') return order.shipped_at
+    if (stepKey === 'delivered') return order.delivered_at
+    return null
+  }
+
+  return (
+    <div className="ord-stepper">
+      {ORDER_STEPS.map((step, i) => {
+        let state = 'future'
+        if (i < currentIndex) state = 'completed'
+        else if (i === currentIndex) state = 'current'
+
+        const ts = getTimestamp(step.key)
+        const lineState = i <= currentIndex ? 'completed' : i === currentIndex + 1 ? 'active' : 'future'
+
+        return (
+          <React.Fragment key={step.key}>
+            {i > 0 && <div className={`ord-stepper__line ord-stepper__line--${lineState}`} />}
+            <div className={`ord-stepper__step ord-stepper__step--${state}`}>
+              <div className="ord-stepper__dot" />
+              <span className="ord-stepper__label">{step.label}</span>
+              {ts && state !== 'future' && (
+                <span className="ord-stepper__date">{formatDate(ts)}</span>
+              )}
+            </div>
+          </React.Fragment>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── Main Component ──
 const Orders = () => {
   const navigate = useNavigate()
   const { user, isAuthenticated, loading: authLoading } = useAuth()
@@ -27,6 +125,10 @@ const Orders = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [expandedId, setExpandedId] = useState(null)
+  const [cancellingId, setCancellingId] = useState(null)
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+  const [cancelError, setCancelError] = useState(null)
+  const [cancelLoading, setCancelLoading] = useState(false)
 
   useEffect(() => {
     if (authLoading) return
@@ -50,6 +152,24 @@ const Orders = () => {
       console.error('Error fetching orders:', err)
       setError('Failed to load orders.')
     } finally { setLoading(false) }
+  }
+
+  const handleCancelOrder = async () => {
+    if (!cancellingId) return
+    try {
+      setCancelError(null)
+      setCancelLoading(true)
+      await orderService.cancelOrder(cancellingId)
+      setOrders(prev => prev.map(o =>
+        o.id === cancellingId ? { ...o, status: 'cancelled' } : o
+      ))
+      setShowCancelConfirm(false)
+      setCancellingId(null)
+    } catch (err) {
+      setCancelError(err.message || 'Failed to cancel order. Please try again.')
+    } finally {
+      setCancelLoading(false)
+    }
   }
 
   // Loading
@@ -145,6 +265,9 @@ const Orders = () => {
               const status = statusConfig[order.status] || statusConfig.pending
               const StatusIcon = status.icon
               const isExpanded = expandedId === order.id
+              const carrier = detectCarrier(order.tracking_number)
+              const showTracking = order.tracking_number && ['shipped', 'delivered', 'completed'].includes(order.status)
+              const payStatus = paymentStatusConfig[order.payment_status]
 
               return (
                 <motion.div
@@ -160,7 +283,6 @@ const Orders = () => {
                     onClick={() => setExpandedId(isExpanded ? null : order.id)}
                   >
                     <div className="ord-card__left">
-                      {/* Item thumbnails */}
                       <div className="ord-card__thumbs">
                         {order.items?.slice(0, 3).map((item, idx) => (
                           <img
@@ -193,7 +315,20 @@ const Orders = () => {
                   {/* Expanded Details */}
                   <div className={`ord-details${isExpanded ? ' open' : ''}`}>
                     <div className="ord-details__inner">
-                      {/* Items */}
+
+                      {/* 1. Progress Stepper */}
+                      <div className="ord-details__section">
+                        <OrderProgressStepper order={order} />
+                      </div>
+
+                      {/* 2. Status Message */}
+                      <div className="ord-details__section">
+                        <p className="ord-status-message">
+                          {statusMessages[order.status] || ''}
+                        </p>
+                      </div>
+
+                      {/* 3. Items */}
                       <div className="ord-details__section">
                         <h4 className="ord-details__label">Items</h4>
                         <div className="ord-details__items">
@@ -225,7 +360,42 @@ const Orders = () => {
                         </div>
                       </div>
 
-                      {/* Shipping */}
+                      {/* 4. Tracking */}
+                      {showTracking && (
+                        <div className="ord-details__section">
+                          <h4 className="ord-details__label">Tracking</h4>
+                          <div className="ord-tracking">
+                            <div className="ord-tracking__row">
+                              <FiTruck className="ord-tracking__icon" />
+                              <div className="ord-tracking__info">
+                                {carrier.name && (
+                                  <span className="ord-tracking__carrier">{carrier.name}</span>
+                                )}
+                                {carrier.url ? (
+                                  <a
+                                    href={carrier.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="ord-tracking__number"
+                                  >
+                                    {order.tracking_number} <FiExternalLink />
+                                  </a>
+                                ) : (
+                                  <span className="ord-tracking__number">{order.tracking_number}</span>
+                                )}
+                              </div>
+                            </div>
+                            {order.shipped_at && (
+                              <span className="ord-tracking__date">Shipped on {formatDate(order.shipped_at)}</span>
+                            )}
+                            {['delivered', 'completed'].includes(order.status) && order.delivered_at && (
+                              <span className="ord-tracking__date">Delivered on {formatDate(order.delivered_at)}</span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 5. Shipping */}
                       {order.shipping_address && (
                         <div className="ord-details__section">
                           <h4 className="ord-details__label">Shipping</h4>
@@ -237,7 +407,7 @@ const Orders = () => {
                         </div>
                       )}
 
-                      {/* Summary */}
+                      {/* 6. Summary + Payment Badge */}
                       <div className="ord-details__section">
                         <h4 className="ord-details__label">Summary</h4>
                         <div className="ord-summary">
@@ -263,26 +433,44 @@ const Orders = () => {
                             <span>Total</span>
                             <span>&#8377;{parseFloat(order.total_amount).toFixed(0)}</span>
                           </div>
+                          {payStatus && (
+                            <div className="ord-summary__payment">
+                              <span
+                                className="ord-payment-badge"
+                                style={{ color: payStatus.color, backgroundColor: payStatus.bg }}
+                              >
+                                {payStatus.label}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
 
-                      {/* Tracking */}
-                      {order.tracking_number && (
-                        <div className="ord-details__section">
-                          <h4 className="ord-details__label">Tracking</h4>
-                          <p className="ord-details__text">
-                            <strong>{order.tracking_number}</strong>
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Notes */}
+                      {/* 7. Customer Notes */}
                       {order.customer_notes && (
                         <div className="ord-details__section">
                           <h4 className="ord-details__label">Your Notes</h4>
                           <p className="ord-details__text ord-details__text--note">{order.customer_notes}</p>
                         </div>
                       )}
+
+                      {/* 8. Cancel Order */}
+                      {['pending', 'confirmed'].includes(order.status) && (
+                        <div className="ord-details__section ord-details__section--actions">
+                          <button
+                            className="ord-cancel-btn"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setCancellingId(order.id)
+                              setShowCancelConfirm(true)
+                              setCancelError(null)
+                            }}
+                          >
+                            Cancel Order
+                          </button>
+                        </div>
+                      )}
+
                     </div>
                   </div>
                 </motion.div>
@@ -291,6 +479,51 @@ const Orders = () => {
           </div>
         )}
       </div>
+
+      {/* Cancel Confirmation Dialog */}
+      <AnimatePresence>
+        {showCancelConfirm && (
+          <motion.div
+            className="ord-confirm-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => { setShowCancelConfirm(false); setCancellingId(null); setCancelError(null) }}
+          >
+            <motion.div
+              className="ord-confirm"
+              initial={{ opacity: 0, y: 30, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.97 }}
+              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="ord-confirm__icon"><FiAlertCircle /></div>
+              <h3 className="ord-confirm__title">Cancel this order?</h3>
+              <p className="ord-confirm__text">
+                This action cannot be undone. Your order will be cancelled.
+              </p>
+              {cancelError && <p className="ord-confirm__error">{cancelError}</p>}
+              <div className="ord-confirm__actions">
+                <button
+                  className="ord-confirm__btn ord-confirm__btn--cancel"
+                  onClick={handleCancelOrder}
+                  disabled={cancelLoading}
+                >
+                  {cancelLoading ? 'Cancelling…' : 'Yes, Cancel Order'}
+                </button>
+                <button
+                  className="ord-confirm__btn ord-confirm__btn--keep"
+                  onClick={() => { setShowCancelConfirm(false); setCancellingId(null); setCancelError(null) }}
+                  disabled={cancelLoading}
+                >
+                  Keep Order
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

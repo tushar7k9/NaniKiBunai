@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import {
   FiPackage,
   FiSearch,
@@ -21,7 +21,29 @@ const ORDER_STATUSES = [
   'delivered',
   'completed',
   'cancelled',
+  'refunded',
 ]
+
+// Valid next statuses from each status
+const STATUS_TRANSITIONS = {
+  pending: ['confirmed', 'cancelled'],
+  confirmed: ['processing', 'cancelled'],
+  processing: ['shipped', 'cancelled'],
+  shipped: ['delivered', 'processing'],
+  delivered: ['completed', 'shipped'],
+  completed: [],
+  cancelled: ['refunded'],
+  refunded: [],
+}
+
+const TERMINAL_STATUSES = ['completed', 'refunded']
+const TRACKING_VISIBLE_STATUSES = ['processing', 'shipped', 'delivered']
+
+// Transitions that require confirmation
+const CONFIRM_TRANSITIONS = {
+  'shipped→processing': 'This will clear the tracking number and shipment date. Continue?',
+  'delivered→shipped': 'This will clear the delivery date. Continue?',
+}
 
 const formatDate = (d) =>
   new Date(d).toLocaleDateString('en-IN', {
@@ -41,30 +63,105 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
   const [savingTracking, setSavingTracking] = useState(false)
   const [statusMsg, setStatusMsg] = useState('')
   const [trackingMsg, setTrackingMsg] = useState('')
+  const [pendingShipment, setPendingShipment] = useState(false)
+  const [confirmTransition, setConfirmTransition] = useState(null) // { to, message }
+  const trackingInputRef = useRef(null)
 
-  const handleStatusChange = async (e) => {
-    const newStatus = e.target.value
-    setStatus(newStatus)
+  const isTerminal = TERMINAL_STATUSES.includes(status)
+  const showTracking = TRACKING_VISIBLE_STATUSES.includes(status)
+  const allowedNextStatuses = STATUS_TRANSITIONS[status] || []
+
+  const executeStatusChange = async (newStatus, opts = {}) => {
     setSavingStatus(true)
     setStatusMsg('')
     try {
-      const updated = await adminService.updateOrderStatus(order.id, newStatus)
+      const updated = await adminService.updateOrderStatus(order.id, newStatus, {
+        fromStatus: status,
+        trackingNumber: opts.trackingNumber,
+      })
       onStatusUpdate(order.id, updated)
-      setStatusMsg('Status updated')
+      if (opts.trackingNumber !== undefined) onTrackingUpdate(order.id, updated)
+      // Sync local tracking from response (may have been cleared)
+      setTracking(updated.tracking_number || '')
+      setStatus(newStatus)
+      setStatusMsg(opts.successMsg || 'Status updated')
     } catch {
       setStatusMsg('Failed to update status')
-      setStatus(order.status)
     } finally {
       setSavingStatus(false)
       setTimeout(() => setStatusMsg(''), 2500)
     }
   }
 
+  const handleStatusChange = async (e) => {
+    const newStatus = e.target.value
+    if (newStatus === status) return
+
+    // Shipped requires tracking number
+    if (newStatus === 'shipped' && !tracking.trim()) {
+      setStatus(newStatus)
+      setPendingShipment(true)
+      setConfirmTransition(null)
+      setStatusMsg('Enter tracking number to confirm shipment')
+      setTimeout(() => trackingInputRef.current?.focus(), 100)
+      return
+    }
+
+    // Check if this transition needs confirmation
+    const confirmKey = `${status}→${newStatus}`
+    const confirmMsg = CONFIRM_TRANSITIONS[confirmKey]
+    if (confirmMsg) {
+      setConfirmTransition({ to: newStatus, message: confirmMsg })
+      return
+    }
+
+    // Cancellation always needs confirmation
+    if (newStatus === 'cancelled') {
+      setConfirmTransition({ to: 'cancelled', message: 'Are you sure you want to cancel this order?' })
+      return
+    }
+
+    // Direct transition (no confirmation needed)
+    await executeStatusChange(newStatus)
+  }
+
+  const handleConfirmTransition = async () => {
+    if (!confirmTransition) return
+    const newStatus = confirmTransition.to
+    setConfirmTransition(null)
+    await executeStatusChange(newStatus)
+  }
+
+  const handleCancelTransition = () => {
+    setConfirmTransition(null)
+  }
+
+  const handleConfirmShipment = async () => {
+    if (!tracking.trim()) {
+      setTrackingMsg('Tracking number is required to ship')
+      setTimeout(() => setTrackingMsg(''), 2500)
+      trackingInputRef.current?.focus()
+      return
+    }
+    setPendingShipment(false)
+    await executeStatusChange('shipped', {
+      trackingNumber: tracking.trim(),
+      successMsg: 'Order shipped with tracking',
+    })
+  }
+
+  const handleCancelShipment = () => {
+    setStatus(order.status)
+    setPendingShipment(false)
+    setStatusMsg('')
+  }
+
   const handleTrackingSave = async () => {
+    if (!tracking.trim()) return
     setSavingTracking(true)
     setTrackingMsg('')
     try {
-      const updated = await adminService.updateTrackingNumber(order.id, tracking)
+      const updated = await adminService.updateTrackingNumber(order.id, tracking.trim())
       onTrackingUpdate(order.id, updated)
       setTrackingMsg('Tracking saved')
     } catch {
@@ -238,29 +335,40 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
       </div>
 
       {/* Actions */}
-      <div className="adm-orders__detail-actions">
+      <div className={`adm-orders__detail-actions${pendingShipment ? ' adm-orders__detail-actions--pending-ship' : ''}`}>
         {/* Status update */}
         <div className="adm-orders__action-group">
           <label className="adm-orders__action-label">Update Status</label>
           <div className="adm-orders__action-row">
-            <select
-              className="adm-select"
-              value={status}
-              onChange={handleStatusChange}
-              disabled={savingStatus}
-            >
-              {ORDER_STATUSES.filter((s) => s !== 'all').map((s) => (
-                <option key={s} value={s}>
-                  {s.charAt(0).toUpperCase() + s.slice(1)}
+            {isTerminal ? (
+              <span className="adm-orders__terminal-badge">
+                {status.charAt(0).toUpperCase() + status.slice(1)} — Final
+              </span>
+            ) : (
+              <select
+                className="adm-select"
+                value={status}
+                onChange={handleStatusChange}
+                disabled={savingStatus || pendingShipment || !!confirmTransition}
+              >
+                <option value={status}>
+                  {status.charAt(0).toUpperCase() + status.slice(1)}
                 </option>
-              ))}
-            </select>
+                {allowedNextStatuses.map((s) => (
+                  <option key={s} value={s}>
+                    {s.charAt(0).toUpperCase() + s.slice(1)}
+                  </option>
+                ))}
+              </select>
+            )}
             {savingStatus && <span className="adm-orders__saving">Saving…</span>}
             {statusMsg && (
               <span
                 className={
                   statusMsg.includes('Failed')
                     ? 'adm-orders__msg adm-orders__msg--error'
+                    : pendingShipment
+                    ? 'adm-orders__msg adm-orders__msg--warn'
                     : 'adm-orders__msg adm-orders__msg--ok'
                 }
               >
@@ -268,42 +376,91 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
               </span>
             )}
           </div>
+
+          {/* Confirmation banner for destructive transitions */}
+          {confirmTransition && (
+            <div className="adm-orders__confirm-banner">
+              <p className="adm-orders__confirm-text">{confirmTransition.message}</p>
+              <div className="adm-orders__confirm-actions">
+                <button
+                  className="adm-btn adm-btn--primary adm-btn--sm"
+                  onClick={handleConfirmTransition}
+                  disabled={savingStatus}
+                >
+                  {savingStatus ? 'Updating…' : 'Yes, continue'}
+                </button>
+                <button
+                  className="adm-btn adm-btn--ghost adm-btn--sm"
+                  onClick={handleCancelTransition}
+                  disabled={savingStatus}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Tracking number */}
-        <div className="adm-orders__action-group">
-          <label className="adm-orders__action-label">
-            <FiTruck style={{ marginRight: 4, verticalAlign: 'middle' }} />
-            Tracking Number
-          </label>
-          <div className="adm-orders__action-row">
-            <input
-              className="adm-input adm-orders__tracking-input"
-              type="text"
-              placeholder="Enter tracking number…"
-              value={tracking}
-              onChange={(e) => setTracking(e.target.value)}
-            />
-            <button
-              className="adm-btn adm-btn--secondary adm-btn--sm"
-              onClick={handleTrackingSave}
-              disabled={savingTracking}
-            >
-              {savingTracking ? 'Saving…' : 'Save'}
-            </button>
-            {trackingMsg && (
-              <span
-                className={
-                  trackingMsg.includes('Failed')
-                    ? 'adm-orders__msg adm-orders__msg--error'
-                    : 'adm-orders__msg adm-orders__msg--ok'
-                }
-              >
-                {trackingMsg}
-              </span>
-            )}
+        {/* Tracking number — only visible for processing/shipped/delivered */}
+        {showTracking && (
+          <div className={`adm-orders__action-group${pendingShipment ? ' adm-orders__action-group--highlight' : ''}`}>
+            <label className="adm-orders__action-label">
+              <FiTruck style={{ marginRight: 4, verticalAlign: 'middle' }} />
+              Tracking Number
+              {pendingShipment && <span className="adm-orders__required-badge">Required</span>}
+            </label>
+            <div className="adm-orders__action-row">
+              <input
+                ref={trackingInputRef}
+                className={`adm-input adm-orders__tracking-input${pendingShipment ? ' adm-orders__tracking-input--required' : ''}`}
+                type="text"
+                placeholder="Enter tracking number…"
+                value={tracking}
+                onChange={(e) => setTracking(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && pendingShipment) handleConfirmShipment()
+                }}
+              />
+              {pendingShipment ? (
+                <>
+                  <button
+                    className="adm-btn adm-btn--primary adm-btn--sm"
+                    onClick={handleConfirmShipment}
+                    disabled={savingStatus}
+                  >
+                    {savingStatus ? 'Shipping…' : 'Confirm Shipment'}
+                  </button>
+                  <button
+                    className="adm-btn adm-btn--ghost adm-btn--sm"
+                    onClick={handleCancelShipment}
+                    disabled={savingStatus}
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <button
+                  className="adm-btn adm-btn--secondary adm-btn--sm"
+                  onClick={handleTrackingSave}
+                  disabled={savingTracking || !tracking.trim()}
+                >
+                  {savingTracking ? 'Saving…' : 'Save'}
+                </button>
+              )}
+              {trackingMsg && (
+                <span
+                  className={
+                    trackingMsg.includes('Failed') || trackingMsg.includes('required')
+                      ? 'adm-orders__msg adm-orders__msg--error'
+                      : 'adm-orders__msg adm-orders__msg--ok'
+                  }
+                >
+                  {trackingMsg}
+                </span>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   )

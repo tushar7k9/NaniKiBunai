@@ -420,6 +420,338 @@
   padding-top: 10px;
 }
 
+/* ── Order Progress Stepper ── */
+.ord-stepper {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 8px 0 4px;
+}
+
+.ord-stepper__step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 1;
+}
+
+.ord-stepper__dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--border-subtle);
+  background: white;
+  transition: all 0.3s ease;
+}
+
+.ord-stepper__step--completed .ord-stepper__dot {
+  background: #2d8659;
+  border-color: #2d8659;
+}
+
+.ord-stepper__step--current .ord-stepper__dot {
+  background: var(--terracotta);
+  border-color: var(--terracotta);
+  box-shadow: 0 0 0 4px rgba(196, 137, 106, 0.2);
+  animation: ord-pulse 2s ease-in-out infinite;
+}
+
+.ord-stepper__step--future .ord-stepper__dot {
+  background: white;
+  border-color: var(--border-subtle);
+}
+
+@keyframes ord-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(196, 137, 106, 0.2); }
+  50%      { box-shadow: 0 0 0 8px rgba(196, 137, 106, 0.08); }
+}
+
+.ord-stepper__label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.ord-stepper__step--completed .ord-stepper__label,
+.ord-stepper__step--current .ord-stepper__label {
+  color: var(--deep-brown);
+}
+
+.ord-stepper__date {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.ord-stepper__line {
+  flex: 1;
+  height: 2px;
+  background: var(--border-subtle);
+  margin-top: 6px;
+  min-width: 16px;
+}
+
+.ord-stepper__line--completed {
+  background: #2d8659;
+}
+
+.ord-stepper__line--active {
+  background: linear-gradient(90deg, #2d8659, var(--border-subtle));
+}
+
+/* Cancelled variant */
+.ord-stepper--cancelled {
+  justify-content: center;
+}
+
+.ord-stepper__cancelled-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #c0392b;
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 10px 16px;
+  background: rgba(192, 57, 43, 0.06);
+  border-radius: 8px;
+}
+
+.ord-stepper__cancelled-indicator svg {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+/* ── Status Message ── */
+.ord-status-message {
+  font-family: var(--font-accent);
+  font-size: 1rem;
+  color: var(--soft-brown);
+  text-align: center;
+  margin: 0;
+  padding: 0 8px;
+  line-height: 1.5;
+}
+
+/* ── Enhanced Tracking ── */
+.ord-tracking {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ord-tracking__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ord-tracking__icon {
+  font-size: 1.1rem;
+  color: var(--terracotta);
+  flex-shrink: 0;
+}
+
+.ord-tracking__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ord-tracking__carrier {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+
+.ord-tracking__number {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--deep-brown);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+a.ord-tracking__number {
+  color: var(--terracotta);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+a.ord-tracking__number:hover {
+  color: var(--terracotta-dark);
+  text-decoration: underline;
+}
+
+a.ord-tracking__number svg {
+  font-size: 0.75rem;
+}
+
+.ord-tracking__date {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  padding-left: 28px;
+}
+
+/* ── Payment Badge ── */
+.ord-summary__payment {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.ord-payment-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+/* ── Cancel Order ── */
+.ord-details__section--actions {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px dashed var(--border-subtle);
+  padding-top: 16px;
+}
+
+.ord-cancel-btn {
+  background: none;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+  font-family: var(--font-body);
+  padding: 8px 20px;
+  border-radius: 100px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.ord-cancel-btn:hover {
+  border-color: #c0392b;
+  color: #c0392b;
+  background: rgba(192, 57, 43, 0.04);
+}
+
+/* ── Cancel Confirmation Dialog ── */
+.ord-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(44, 36, 22, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 24px;
+}
+
+.ord-confirm {
+  background: white;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 400px;
+  padding: 32px 28px;
+  text-align: center;
+  box-shadow: 0 24px 64px rgba(92, 64, 51, 0.2);
+}
+
+.ord-confirm__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(192, 57, 43, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+
+.ord-confirm__icon svg {
+  font-size: 1.4rem;
+  color: #c0392b;
+}
+
+.ord-confirm__title {
+  font-family: var(--font-heading);
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--deep-brown);
+  margin: 0 0 8px;
+}
+
+.ord-confirm__text {
+  font-size: 0.85rem;
+  color: var(--text-light);
+  line-height: 1.6;
+  margin: 0 0 20px;
+}
+
+.ord-confirm__error {
+  font-size: 0.8rem;
+  color: #c0392b;
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  background: rgba(192, 57, 43, 0.06);
+  border-radius: 8px;
+}
+
+.ord-confirm__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ord-confirm__btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 100px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.ord-confirm__btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ord-confirm__btn--cancel {
+  background: #c0392b;
+  color: white;
+}
+
+.ord-confirm__btn--cancel:hover:not(:disabled) {
+  background: #a93226;
+}
+
+.ord-confirm__btn--keep {
+  background: none;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-light);
+}
+
+.ord-confirm__btn--keep:hover:not(:disabled) {
+  border-color: var(--deep-brown);
+  color: var(--deep-brown);
+}
+
 /* ═══════════════════════════════════════════
    Responsive
    ═══════════════════════════════════════════ */
@@ -447,6 +779,18 @@
   .ord-item__price {
     margin-left: auto;
   }
+
+  .ord-stepper__label {
+    font-size: 0.6rem;
+  }
+
+  .ord-stepper__date {
+    font-size: 0.58rem;
+  }
+
+  .ord-tracking__date {
+    padding-left: 0;
+  }
 }
 
 @media (max-width: 480px) {
@@ -462,5 +806,34 @@
 
   .ord-details.open .ord-details__inner {
     padding: 16px;
+  }
+
+  .ord-stepper__label {
+    font-size: 0.55rem;
+    max-width: 48px;
+    white-space: normal;
+    line-height: 1.2;
+  }
+
+  .ord-stepper__date {
+    display: none;
+  }
+
+  .ord-stepper__dot {
+    width: 12px;
+    height: 12px;
+  }
+
+  .ord-stepper__line {
+    margin-top: 5px;
+    min-width: 8px;
+  }
+
+  .ord-tracking__date {
+    padding-left: 0;
+  }
+
+  .ord-confirm {
+    padding: 24px 20px;
   }
 }
