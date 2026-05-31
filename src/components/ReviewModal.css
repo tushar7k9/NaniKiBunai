@@ -99,6 +99,28 @@
   color: var(--terracotta-dark);
 }
 
+/* ── Pending Notice ── */
+.rm-pending-notice {
+  margin: 14px 28px 0;
+  padding: 10px 14px;
+  background: #fffbf0;
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  border-radius: 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text-light);
+  line-height: 1.5;
+}
+
+.rm-pending-notice__icon {
+  color: #b8960c;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
 /* ── Form ── */
 .rm-form {
   padding: 24px 28px 28px;
@@ -158,14 +180,6 @@
   transform: scale(1.15);
 }
 
-.rm-star.filled {
-  color: var(--terracotta);
-}
-
-.rm-star.filled svg {
-  fill: var(--terracotta);
-  stroke: var(--terracotta);
-}
 
 .rm-stars__label {
   font-family: var(--font-accent);
@@ -357,6 +371,76 @@
   font-size: 1.1rem;
   color: var(--text-muted);
   opacity: 0.7;
+}
+
+/* ═══════════════════════════════════════════
+   Success Screen
+   ═══════════════════════════════════════════ */
+
+.rm-success {
+  padding: 48px 32px 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.rm-success__check {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2d8659 0%, #3da06d 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+  margin-bottom: 24px;
+  box-shadow: 0 8px 24px rgba(45, 134, 89, 0.25);
+}
+
+.rm-success__title {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--deep-brown);
+  margin: 0 0 16px;
+}
+
+.rm-success__stars {
+  display: flex;
+  gap: 4px;
+  font-size: 1.3rem;
+  margin-bottom: 20px;
+}
+
+.rm-success__message {
+  font-size: 0.92rem;
+  color: var(--text-light);
+  line-height: 1.7;
+  margin: 0 0 10px;
+  max-width: 380px;
+}
+
+.rm-success__note {
+  font-family: var(--font-accent);
+  font-size: 1.05rem;
+  color: var(--terracotta);
+  line-height: 1.5;
+  margin: 0;
+  max-width: 360px;
+}
+
+.rm-success__stitch {
+  width: 60px;
+  height: 0;
+  border-top: 2px dashed var(--terracotta-light);
+  margin: 24px 0;
+  opacity: 0.5;
+}
+
+.rm-success__btn {
+  min-width: 200px;
 }
 
 /* ═══════════════════════════════════════════

@@ -246,18 +246,8 @@
   gap: 2px;
 }
 
-.pd-rating__stars .star {
+.pd-rating__stars svg {
   font-size: 0.95rem;
-  color: #ddd;
-}
-
-.pd-rating__stars .star.filled {
-  color: #e8a23a;
-}
-
-.pd-rating__stars .star.filled svg {
-  fill: #e8a23a;
-  stroke: #e8a23a;
 }
 
 .pd-rating__text {
@@ -663,6 +653,81 @@
   font-size: 0.85rem;
 }
 
+/* Pending review banner */
+.pd-pending-review {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  background: #fffbf0;
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.pd-pending-review__content {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.pd-pending-review__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(212, 175, 55, 0.12);
+  color: #b8960c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.pd-pending-review__text {
+  min-width: 0;
+}
+
+.pd-pending-review__title {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--deep-brown);
+  margin-bottom: 2px;
+}
+
+.pd-pending-review__desc {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.pd-pending-review__edit {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 14px;
+  border-radius: 100px;
+  border: 1.5px solid var(--deep-brown);
+  background: transparent;
+  color: var(--deep-brown);
+  font-size: 0.78rem;
+  font-weight: 500;
+  font-family: var(--font-body);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.pd-pending-review__edit:hover {
+  background: var(--deep-brown);
+  color: white;
+}
+
 /* Summary */
 .pd-reviews__summary {
   display: flex;
@@ -699,18 +764,8 @@
   gap: 2px;
 }
 
-.pd-reviews__stars-row .star {
+.pd-reviews__stars-row svg {
   font-size: 0.9rem;
-  color: rgba(92, 64, 51, 0.15);
-}
-
-.pd-reviews__stars-row .star.filled {
-  color: var(--terracotta);
-}
-
-.pd-reviews__stars-row .star.filled svg {
-  fill: var(--terracotta);
-  stroke: var(--terracotta);
 }
 
 .pd-reviews__count-text {
@@ -829,18 +884,8 @@
   flex-shrink: 0;
 }
 
-.pd-review-stars .star {
+.pd-review-stars svg {
   font-size: 0.78rem;
-  color: rgba(92, 64, 51, 0.15);
-}
-
-.pd-review-stars .star.filled {
-  color: var(--terracotta);
-}
-
-.pd-review-stars .star.filled svg {
-  fill: var(--terracotta);
-  stroke: var(--terracotta);
 }
 
 .pd-review-title {

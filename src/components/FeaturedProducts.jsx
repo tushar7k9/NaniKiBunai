@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { FiHeart, FiShoppingBag, FiArrowRight, FiCheck } from 'react-icons/fi'
+import { FiHeart, FiShoppingBag, FiArrowRight, FiCheck, FiStar } from 'react-icons/fi'
 import { useProducts } from '../hooks/useProducts'
 import { useCart } from '../hooks/useCart'
 import { useFavorites } from '../hooks/useFavorites'
@@ -123,7 +123,15 @@ const FeaturedCard = ({ product, index, addToCart, isFavorite, toggleFavorite })
 
       {/* Info */}
       <div className="fp-card__info">
-        <span className="fp-card__category">{product.category}</span>
+        <div className="fp-card__top-row">
+          <span className="fp-card__category">{product.category}</span>
+          {product.average_rating > 0 && (
+            <span className="fp-card__rating">
+              <FiStar style={{ fill: 'var(--terracotta)', stroke: 'var(--terracotta)', fontSize: '0.7rem' }} />
+              {product.average_rating}
+            </span>
+          )}
+        </div>
         <h3 className="fp-card__name">{product.name}</h3>
         <div className="fp-card__row">
           <span className="fp-card__price">&#8377;{product.price}</span>

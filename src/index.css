@@ -194,6 +194,11 @@ img {
   background: var(--cream);
 }
 
+.icon-btn--active {
+  background: var(--section-bg-alt);
+  color: var(--terracotta);
+}
+
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-track { background: var(--cream); }

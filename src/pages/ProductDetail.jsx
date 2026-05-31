@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { FiHeart, FiShoppingBag, FiChevronLeft, FiChevronRight, FiStar, FiEdit3, FiThumbsUp, FiTruck, FiShield, FiRefreshCw, FiX, FiMaximize2 } from 'react-icons/fi'
+import { FiHeart, FiShoppingBag, FiChevronLeft, FiChevronRight, FiStar, FiEdit3, FiThumbsUp, FiTruck, FiShield, FiRefreshCw, FiX, FiMaximize2, FiClock } from 'react-icons/fi'
 import { useProducts } from '../hooks/useProducts'
 import { useCart } from '../hooks/useCart'
 import { useFavorites } from '../hooks/useFavorites'
@@ -201,6 +201,7 @@ const SizeChartModal = ({ isOpen, onClose, category }) => {
 const ProductDetail = () => {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
 
   const { products, loading: productsLoading, getProductById } = useProducts()
   const { addToCart } = useCart()
@@ -230,9 +231,13 @@ const ProductDetail = () => {
   // Set default size when product loads
   useEffect(() => {
     if (product?.sizes?.length > 0 && !selectedSize) {
-      setSelectedSize(product.sizes[0])
+      if (location.state?.customSize) {
+        setIsCustomSize(true)
+      } else {
+        setSelectedSize(product.sizes[0])
+      }
     }
-  }, [product, selectedSize])
+  }, [product, selectedSize, location.state])
 
   // Fetch reviews
   useEffect(() => {
@@ -329,9 +334,19 @@ const ProductDetail = () => {
   }
 
   const renderStars = (rating) => (
-    [...Array(5)].map((_, i) => (
-      <FiStar key={i} className={i < Math.floor(rating) ? 'star filled' : 'star'} />
-    ))
+    [...Array(5)].map((_, i) => {
+      const isFilled = i < Math.floor(rating)
+      return (
+        <FiStar
+          key={i}
+          style={{
+            fill: isFilled ? 'var(--terracotta)' : 'none',
+            stroke: isFilled ? 'var(--terracotta)' : 'var(--border-subtle)',
+            fontSize: 'inherit',
+          }}
+        />
+      )
+    })
   )
 
   const isOutOfStock = product?.stock_quantity === 0
@@ -650,6 +665,26 @@ const ProductDetail = () => {
               )}
             </div>
 
+            {/* Pending review banner */}
+            {userReview && !userReview.is_approved && (
+              <div className="pd-pending-review">
+                <div className="pd-pending-review__content">
+                  <div className="pd-pending-review__icon">
+                    <FiClock />
+                  </div>
+                  <div className="pd-pending-review__text">
+                    <span className="pd-pending-review__title">Your review is awaiting approval</span>
+                    <p className="pd-pending-review__desc">
+                      You rated this {userReview.rating}/5{userReview.title ? ` — "${userReview.title}"` : ''}. It will be visible to others once approved.
+                    </p>
+                  </div>
+                </div>
+                <button className="pd-pending-review__edit" onClick={handleWriteReview}>
+                  <FiEdit3 /> Edit
+                </button>
+              </div>
+            )}
+
             {reviewsLoading ? (
               <div className="pd-reviews-loading">
                 {[0, 1, 2].map(i => (
@@ -748,9 +783,11 @@ const ProductDetail = () => {
                 </div>
                 <h3>No reviews yet</h3>
                 <p>Be the first to share your experience with this piece.</p>
-                <button className="pd-write-review-btn" onClick={handleWriteReview}>
-                  <FiEdit3 /> Write a Review
-                </button>
+                {!userReview && (
+                  <button className="pd-write-review-btn" onClick={handleWriteReview}>
+                    <FiEdit3 /> Write a Review
+                  </button>
+                )}
               </div>
             )}
           </motion.section>

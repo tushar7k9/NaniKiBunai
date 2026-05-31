@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { FiShoppingCart, FiMenu, FiX, FiSearch, FiHeart, FiUser, FiLogOut, FiPackage } from 'react-icons/fi'
+import { FiShoppingCart, FiMenu, FiX, FiSearch, FiHeart, FiUser, FiLogOut, FiPackage, FiGrid } from 'react-icons/fi'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import './Header.css'
@@ -8,7 +8,7 @@ import './Header.css'
 const Header = ({ cartCount, favoritesCount, onCartClick, onFavoritesClick, cartIconRef, onSearchClick }) => {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, signOut, isAuthenticated } = useAuth()
+  const { user, signOut, isAuthenticated, isAdmin } = useAuth()
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
@@ -93,7 +93,7 @@ const Header = ({ cartCount, favoritesCount, onCartClick, onFavoritesClick, cart
           </motion.button>
 
           <motion.button
-            className="icon-btn favorites-btn"
+            className={`icon-btn favorites-btn${location.pathname === '/favorites' ? ' icon-btn--active' : ''}`}
             onClick={() => navigate('/favorites')}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
@@ -134,7 +134,7 @@ const Header = ({ cartCount, favoritesCount, onCartClick, onFavoritesClick, cart
           {isAuthenticated ? (
             <div className="user-menu-container">
               <motion.button
-                className="icon-btn user-btn"
+                className={`icon-btn user-btn${['/profile', '/orders'].includes(location.pathname) ? ' icon-btn--active' : ''}`}
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
@@ -164,8 +164,21 @@ const Header = ({ cartCount, favoritesCount, onCartClick, onFavoritesClick, cart
 
                   <div className="dropdown-divider"></div>
 
+                  {isAdmin && (
+                    <button
+                      className={`dropdown-item dropdown-item--admin${location.pathname.startsWith('/admin') ? ' dropdown-item--active' : ''}`}
+                      onClick={() => {
+                        setIsUserMenuOpen(false)
+                        navigate('/admin')
+                      }}
+                    >
+                      <FiGrid />
+                      <span>Admin Dashboard</span>
+                    </button>
+                  )}
+
                   <button
-                    className="dropdown-item"
+                    className={`dropdown-item${location.pathname === '/profile' ? ' dropdown-item--active' : ''}`}
                     onClick={handleProfileClick}
                   >
                     <FiUser />
@@ -173,7 +186,7 @@ const Header = ({ cartCount, favoritesCount, onCartClick, onFavoritesClick, cart
                   </button>
 
                   <button
-                    className="dropdown-item"
+                    className={`dropdown-item${location.pathname === '/orders' ? ' dropdown-item--active' : ''}`}
                     onClick={() => {
                       setIsUserMenuOpen(false)
                       navigate('/orders')
@@ -184,7 +197,7 @@ const Header = ({ cartCount, favoritesCount, onCartClick, onFavoritesClick, cart
                   </button>
 
                   <button
-                    className="dropdown-item"
+                    className={`dropdown-item${location.pathname === '/favorites' ? ' dropdown-item--active' : ''}`}
                     onClick={() => {
                       setIsUserMenuOpen(false)
                       navigate('/favorites')

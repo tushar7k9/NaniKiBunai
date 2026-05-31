@@ -158,12 +158,27 @@
   gap: 4px;
 }
 
+.fp-card__top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .fp-card__category {
   font-size: 0.72rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 1.2px;
   color: var(--text-muted);
+}
+
+.fp-card__rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--deep-brown);
 }
 
 .fp-card__name {

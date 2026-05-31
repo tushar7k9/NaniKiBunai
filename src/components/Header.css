@@ -211,6 +211,16 @@
   color: var(--terracotta);
 }
 
+.dropdown-item--active {
+  background: var(--section-bg-alt);
+  color: var(--terracotta);
+}
+
+.dropdown-item--admin {
+  color: var(--terracotta);
+  font-weight: 500;
+}
+
 .dropdown-item svg {
   font-size: 18px;
   color: var(--terracotta);

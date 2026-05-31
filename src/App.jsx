@@ -39,6 +39,15 @@ import Profile from './pages/Profile'
 import Checkout from './pages/Checkout'
 import Orders from './pages/Orders'
 
+// Admin
+import AdminRoute from './components/AdminRoute'
+import AdminLayout from './pages/admin/AdminLayout'
+import AdminDashboard from './pages/admin/Dashboard'
+import AdminOrders from './pages/admin/Orders'
+import AdminProducts from './pages/admin/Products'
+import AdminReviews from './pages/admin/Reviews'
+import AdminMessages from './pages/admin/Messages'
+
 import './App.css'
 
 // Import hooks
@@ -84,42 +93,55 @@ function AppContent() {
   return (
     <Router>
       <ScrollToTop />
-      <div className="App">
-        <Header
-          cartCount={getTotalItems()}
-          favoritesCount={getFavoritesCount()}
-          onCartClick={() => setIsCartOpen(true)}
-          onSearchClick={() => setIsSearchOpen(true)}
-          onFavoritesClick={() => {/* Will navigate to /favorites */}}
-          cartIconRef={cartIconRef}
-        />
-        <SearchOverlay
-          isOpen={isSearchOpen}
-          onClose={() => setIsSearchOpen(false)}
-        />
-        <Cart
-          isOpen={isCartOpen}
-          onClose={() => setIsCartOpen(false)}
-          cartItems={cart}
-          updateQuantity={updateQuantity}
-          removeFromCart={removeFromCart}
-        />
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/products" element={<Products />} />
-          <Route path="/product/:id" element={<ProductDetail />} />
-          <Route path="/favorites" element={<Favorites />} />
-          <Route path="/collections" element={<Collections />} />
-          <Route path="/contact" element={<Contact />} />
-          {/* <Route path="/our-story" element={<OurStory />} /> */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/checkout" element={<Checkout />} />
-          <Route path="/orders" element={<Orders />} />
-        </Routes>
-        <Footer />
-      </div>
+      <Routes>
+        {/* Admin routes — separate layout, no Header/Footer */}
+        <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
+          <Route index element={<AdminDashboard />} />
+          <Route path="orders" element={<AdminOrders />} />
+          <Route path="products" element={<AdminProducts />} />
+          <Route path="reviews" element={<AdminReviews />} />
+          <Route path="messages" element={<AdminMessages />} />
+        </Route>
+
+        {/* Store routes */}
+        <Route path="*" element={
+          <div className="App">
+            <Header
+              cartCount={getTotalItems()}
+              favoritesCount={getFavoritesCount()}
+              onCartClick={() => setIsCartOpen(true)}
+              onSearchClick={() => setIsSearchOpen(true)}
+              onFavoritesClick={() => {/* Will navigate to /favorites */}}
+              cartIconRef={cartIconRef}
+            />
+            <SearchOverlay
+              isOpen={isSearchOpen}
+              onClose={() => setIsSearchOpen(false)}
+            />
+            <Cart
+              isOpen={isCartOpen}
+              onClose={() => setIsCartOpen(false)}
+              cartItems={cart}
+              updateQuantity={updateQuantity}
+              removeFromCart={removeFromCart}
+            />
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/products" element={<Products />} />
+              <Route path="/product/:id" element={<ProductDetail />} />
+              <Route path="/favorites" element={<Favorites />} />
+              <Route path="/collections" element={<Collections />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/checkout" element={<Checkout />} />
+              <Route path="/orders" element={<Orders />} />
+            </Routes>
+            <Footer />
+          </div>
+        } />
+      </Routes>
     </Router>
   )
 }

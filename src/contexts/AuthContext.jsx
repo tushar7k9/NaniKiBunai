@@ -15,6 +15,8 @@ import { supabase } from '../lib/supabase'
 
 export const AuthContext = createContext()
 
+const ADMIN_EMAIL = 'nanikiibunai@gmail.com'
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -237,6 +239,8 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
+  const isAdmin = !!user && user.email === ADMIN_EMAIL
+
   const value = {
     user,
     loading,
@@ -249,6 +253,7 @@ export const AuthProvider = ({ children }) => {
     updatePassword,
     updateUserMetadata,
     isAuthenticated: !!user,
+    isAdmin,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

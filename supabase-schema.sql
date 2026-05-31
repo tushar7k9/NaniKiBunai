@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS products (
   description TEXT,
   colors TEXT[] DEFAULT '{}',
   sizes TEXT[] DEFAULT ARRAY['S', 'M', 'L', 'XL', 'XXL'],
+  average_rating NUMERIC(2,1) DEFAULT 0,
+  review_count INTEGER DEFAULT 0,
   difficulty TEXT CHECK (difficulty IN ('beginner', 'intermediate', 'advanced')),
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT now(),
@@ -289,3 +291,103 @@ INSERT INTO products (id, name, category, price, images, description, colors, di
 
 -- Reset the sequence to avoid ID conflicts
 SELECT setval('products_id_seq', (SELECT MAX(id) FROM products));
+
+-- ============================================
+-- 7. REACHOUT SUBMISSIONS TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS reachout_submissions (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  phone TEXT,
+  subject TEXT,
+  message TEXT NOT NULL,
+  status TEXT DEFAULT 'new' CHECK (status IN ('new', 'read', 'replied')),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_reachout_created_at ON reachout_submissions(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reachout_status ON reachout_submissions(status);
+CREATE INDEX IF NOT EXISTS idx_reachout_email ON reachout_submissions(email);
+
+-- RLS
+ALTER TABLE reachout_submissions ENABLE ROW LEVEL SECURITY;
+
+-- Anyone can submit a contact form (no auth required)
+CREATE POLICY "Anyone can submit reachout"
+  ON reachout_submissions FOR INSERT
+  WITH CHECK (true);
+
+-- Only admin can read reachout submissions
+CREATE POLICY "Admin can read reachout submissions"
+  ON reachout_submissions FOR SELECT
+  USING ((auth.jwt() ->> 'email') = 'nanikiibunai@gmail.com');
+
+-- Admin can update reachout submission status
+CREATE POLICY "Admin can update reachout submissions"
+  ON reachout_submissions FOR UPDATE
+  USING ((auth.jwt() ->> 'email') = 'nanikiibunai@gmail.com');
+
+-- ============================================
+-- ADMIN RLS POLICIES
+-- Admin email: nanikiibunai@gmail.com
+-- ============================================
+
+-- PRODUCTS: Admin can view all (including inactive), insert, update, delete
+CREATE POLICY "Admin full access on products"
+  ON products FOR ALL
+  USING ((auth.jwt() ->> 'email') = 'nanikiibunai@gmail.com')
+  WITH CHECK ((auth.jwt() ->> 'email') = 'nanikiibunai@gmail.com');
+
+-- ORDERS: Admin can read ALL orders
+CREATE POLICY "Admin can read all orders"
+  ON orders FOR SELECT
+  USING ((auth.jwt() ->> 'email') = 'nanikiibunai@gmail.com');
+
+-- ORDERS: Admin can update ANY order (status, tracking, etc.)
+CREATE POLICY "Admin can update all orders"
+  ON orders FOR UPDATE
+  USING ((auth.jwt() ->> 'email') = 'nanikiibunai@gmail.com');
+
+-- ORDER_ITEMS: Admin can read all order items
+CREATE POLICY "Admin can read all order items"
+  ON order_items FOR SELECT
+  USING ((auth.jwt() ->> 'email') = 'nanikiibunai@gmail.com');
+
+-- REVIEWS: Admin can read ALL reviews (including unapproved)
+CREATE POLICY "Admin can read all reviews"
+  ON reviews FOR SELECT
+  USING ((auth.jwt() ->> 'email') = 'nanikiibunai@gmail.com');
+
+-- REVIEWS: Admin can update any review (approve/reject)
+CREATE POLICY "Admin can update all reviews"
+  ON reviews FOR UPDATE
+  USING ((auth.jwt() ->> 'email') = 'nanikiibunai@gmail.com');
+
+-- REVIEWS: Admin can delete any review
+CREATE POLICY "Admin can delete all reviews"
+  ON reviews FOR DELETE
+  USING ((auth.jwt() ->> 'email') = 'nanikiibunai@gmail.com');
+
+-- ============================================
+-- FUNCTIONS
+-- ============================================
+
+-- Atomic increment/decrement for helpful_count (avoids race conditions)
+CREATE OR REPLACE FUNCTION increment_helpful_count(review_id INT, delta INT)
+RETURNS INT
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  new_count INT;
+BEGIN
+  UPDATE reviews
+  SET helpful_count = GREATEST(0, COALESCE(helpful_count, 0) + delta)
+  WHERE id = review_id
+  RETURNING helpful_count INTO new_count;
+
+  RETURN new_count;
+END;
+$$;

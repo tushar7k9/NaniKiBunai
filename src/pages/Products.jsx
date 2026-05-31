@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion'
-import { FiHeart, FiShoppingBag, FiChevronDown, FiCheck } from 'react-icons/fi'
+import { FiHeart, FiShoppingBag, FiChevronDown, FiCheck, FiStar } from 'react-icons/fi'
 import { useProducts } from '../hooks/useProducts'
 import { useCart } from '../hooks/useCart'
 import { useFavorites } from '../hooks/useFavorites'
@@ -203,7 +203,15 @@ const ProductCard = ({ product, addToCart, isFavorite, toggleFavorite, index }) 
 
       {/* Info */}
       <div className="p-card__info">
-        <span className="p-card__category">{product.category}</span>
+        <div className="p-card__top-row">
+          <span className="p-card__category">{product.category}</span>
+          {product.average_rating > 0 && (
+            <span className="p-card__rating">
+              <FiStar style={{ fill: 'var(--terracotta)', stroke: 'var(--terracotta)', fontSize: '0.7rem' }} />
+              {product.average_rating}
+            </span>
+          )}
+        </div>
         <h3 className="p-card__name">{product.name}</h3>
 
         {/* Size pills */}
@@ -220,7 +228,7 @@ const ProductCard = ({ product, addToCart, isFavorite, toggleFavorite, index }) 
             ))}
             <button
               className="p-card__size p-card__size--custom"
-              onClick={(e) => { e.stopPropagation(); navigate(`/product/${product.id}`) }}
+              onClick={(e) => { e.stopPropagation(); navigate(`/product/${product.id}`, { state: { customSize: true } }) }}
               title="Custom size — enter your measurements"
             >
               Custom

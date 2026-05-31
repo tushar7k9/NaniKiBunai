@@ -1,0 +1,157 @@
+/* ═══════════════════════════════════════════
+   Admin Messages Page
+   ═══════════════════════════════════════════ */
+
+/* ── Table overrides ── */
+.adm-messages__table .adm-messages__row {
+  cursor: pointer;
+}
+
+.adm-messages__row--new td {
+  background: #fffdf5;
+}
+
+.adm-messages__row--expanded td {
+  background: var(--section-bg-alt);
+  border-bottom: none;
+}
+
+/* ── Name cell ── */
+.adm-messages__name {
+  font-size: 0.88rem;
+  color: var(--deep-brown);
+}
+
+.adm-messages__name--bold {
+  font-weight: 600;
+}
+
+/* ── Email cell ── */
+.adm-messages__email {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+/* ── Subject cell ── */
+.adm-messages__subject--bold {
+  font-weight: 600;
+  color: var(--deep-brown);
+}
+
+.adm-messages__no-subject {
+  font-size: 0.82rem;
+  color: var(--text-light);
+  font-style: italic;
+}
+
+/* ── Date cell ── */
+.adm-messages__date {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ── Chevron cell ── */
+.adm-messages__chevron-cell {
+  width: 40px;
+  text-align: right;
+}
+
+.adm-messages__chevron {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-muted);
+  font-size: 1rem;
+  transition: color 0.15s ease;
+}
+
+.adm-messages__row:hover .adm-messages__chevron {
+  color: var(--terracotta);
+}
+
+/* ── Expanded detail row ── */
+.adm-messages__expanded-row td {
+  padding: 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.adm-messages__detail {
+  padding: 20px 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border-top: 1px dashed var(--border-subtle);
+}
+
+/* ── Message body ── */
+.adm-messages__body {
+  background: white;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+
+.adm-messages__message-text {
+  font-size: 0.88rem;
+  color: var(--deep-brown);
+  line-height: 1.7;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Detail footer ── */
+.adm-messages__detail-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* ── Contact info ── */
+.adm-messages__contact-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.adm-messages__contact-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.adm-messages__contact-item svg {
+  font-size: 0.9rem;
+  flex-shrink: 0;
+  color: var(--terracotta);
+}
+
+/* ── Detail actions ── */
+.adm-messages__detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .adm-messages__table {
+    font-size: 0.82rem;
+  }
+
+  .adm-messages__email,
+  .adm-messages__date {
+    display: none;
+  }
+
+  .adm-messages__detail-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

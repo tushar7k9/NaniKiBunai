@@ -345,9 +345,26 @@ export const reviewService = {
    * Get voted reviews from localStorage
    * @returns {Array<number>} Array of review IDs that user has voted on
    */
+  _getStorageKey: () => {
+    try {
+      // Migrate old shared key on first access
+      const oldVotes = localStorage.getItem('helpful_votes')
+      if (oldVotes) localStorage.removeItem('helpful_votes')
+
+      const authData = localStorage.getItem('nani-ki-bunai-auth')
+      if (authData) {
+        const parsed = JSON.parse(authData)
+        const userId = parsed?.user?.id
+        if (userId) return `helpful_votes_${userId}`
+      }
+    } catch {}
+    return 'helpful_votes_guest'
+  },
+
   getVotedReviews: () => {
     try {
-      const voted = localStorage.getItem('helpful_votes')
+      const key = reviewService._getStorageKey()
+      const voted = localStorage.getItem(key)
       return voted ? JSON.parse(voted) : []
     } catch (error) {
       console.error('Error getting voted reviews:', error)
@@ -355,36 +372,25 @@ export const reviewService = {
     }
   },
 
-  /**
-   * Check if user has voted on a review
-   * @param {number} reviewId - Review ID
-   * @returns {boolean} True if user has voted
-   */
   hasVotedOnReview: (reviewId) => {
     const votedReviews = reviewService.getVotedReviews()
     return votedReviews.includes(reviewId)
   },
 
-  /**
-   * Add review to voted list
-   * @param {number} reviewId - Review ID
-   */
   addToVoted: (reviewId) => {
+    const key = reviewService._getStorageKey()
     const votedReviews = reviewService.getVotedReviews()
     if (!votedReviews.includes(reviewId)) {
       votedReviews.push(reviewId)
-      localStorage.setItem('helpful_votes', JSON.stringify(votedReviews))
+      localStorage.setItem(key, JSON.stringify(votedReviews))
     }
   },
 
-  /**
-   * Remove review from voted list
-   * @param {number} reviewId - Review ID
-   */
   removeFromVoted: (reviewId) => {
+    const key = reviewService._getStorageKey()
     const votedReviews = reviewService.getVotedReviews()
     const filtered = votedReviews.filter((id) => id !== reviewId)
-    localStorage.setItem('helpful_votes', JSON.stringify(filtered))
+    localStorage.setItem(key, JSON.stringify(filtered))
   },
 
   /**
@@ -395,54 +401,44 @@ export const reviewService = {
   toggleHelpfulVote: async (reviewId) => {
     try {
       const hasVoted = reviewService.hasVotedOnReview(reviewId)
+      const delta = hasVoted ? -1 : 1
 
-      // Fetch current helpful_count
-      const { data: review, error: fetchError } = await supabase
-        .from('reviews')
-        .select('helpful_count')
-        .eq('id', reviewId)
-        .single()
+      // Atomic increment/decrement using rpc
+      // Falls back to read-then-write if rpc not available
+      let newCount
 
-      if (fetchError) {
-        console.error('Error fetching review:', fetchError)
-        throw fetchError
+      const { data: rpcResult, error: rpcError } = await supabase
+        .rpc('increment_helpful_count', { review_id: reviewId, delta })
+
+      if (rpcError) {
+        // Fallback: read current count, compute new value, write back
+        const { data: review, error: fetchError } = await supabase
+          .from('reviews')
+          .select('helpful_count')
+          .eq('id', reviewId)
+          .single()
+
+        if (fetchError) throw fetchError
+
+        newCount = Math.max(0, (review.helpful_count || 0) + delta)
+
+        const { error: updateError } = await supabase
+          .from('reviews')
+          .update({ helpful_count: newCount })
+          .eq('id', reviewId)
+
+        if (updateError) throw updateError
+      } else {
+        newCount = rpcResult
       }
-
-      const currentCount = review.helpful_count || 0
 
       if (hasVoted) {
-        // User already voted - remove vote (decrement count)
-        const newCount = Math.max(0, currentCount - 1)
-
-        const { error: updateError } = await supabase
-          .from('reviews')
-          .update({ helpful_count: newCount })
-          .eq('id', reviewId)
-
-        if (updateError) {
-          console.error('Error updating helpful count:', updateError)
-          throw updateError
-        }
-
         reviewService.removeFromVoted(reviewId)
-        return { voted: false, newCount }
       } else {
-        // User hasn't voted - add vote (increment count)
-        const newCount = currentCount + 1
-
-        const { error: updateError } = await supabase
-          .from('reviews')
-          .update({ helpful_count: newCount })
-          .eq('id', reviewId)
-
-        if (updateError) {
-          console.error('Error updating helpful count:', updateError)
-          throw updateError
-        }
-
         reviewService.addToVoted(reviewId)
-        return { voted: true, newCount }
       }
+
+      return { voted: !hasVoted, newCount }
     } catch (error) {
       console.error('Error in toggleHelpfulVote:', error)
       throw error
