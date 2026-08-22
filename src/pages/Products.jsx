@@ -87,10 +87,21 @@ const CategoryReveal = ({ categoryName, onComplete }) => {
 }
 
 /* ─── Product Card ─── */
-const isTouchDevice = typeof window !== 'undefined' && ('ontouchstart' in window || window.matchMedia('(hover: none)').matches)
+const useIsTouchDevice = () => {
+  const [isTouch, setIsTouch] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia('(hover: none), (pointer: coarse)')
+    setIsTouch(mq.matches)
+    const handler = (e) => setIsTouch(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+  return isTouch
+}
 
 const ProductCard = ({ product, addToCart, isFavorite, toggleFavorite, index }) => {
   const navigate = useNavigate()
+  const isTouch = useIsTouchDevice()
   const [isHovered, setIsHovered] = useState(false)
   const [selectedColor, setSelectedColor] = useState(0)
   const [selectedSize, setSelectedSize] = useState(product.sizes?.[0] || 'S')
@@ -139,8 +150,8 @@ const ProductCard = ({ product, addToCart, isFavorite, toggleFavorite, index }) 
         layout: { duration: 0.35, ease: [0.25, 1, 0.5, 1] }
       }}
       onClick={handleCardClick}
-      onMouseEnter={() => !isTouchDevice && setIsHovered(true)}
-      onMouseLeave={() => !isTouchDevice && setIsHovered(false)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       {/* Image */}
       <div className="p-card__image-wrap">
@@ -165,7 +176,7 @@ const ProductCard = ({ product, addToCart, isFavorite, toggleFavorite, index }) 
           className={`p-card__fav${isFavorite ? ' active' : ''}`}
           onClick={(e) => { e.stopPropagation(); toggleFavorite(product.id) }}
           initial={false}
-          animate={{ opacity: isFavorite || isHovered || isTouchDevice ? 1 : 0 }}
+          animate={{ opacity: isTouch || isFavorite || isHovered ? 1 : 0 }}
           whileTap={{ scale: 0.85 }}
         >
           <FiHeart />
@@ -180,46 +191,26 @@ const ProductCard = ({ product, addToCart, isFavorite, toggleFavorite, index }) 
 
         {/* Add to Bag overlay */}
         {!isOutOfStock && (
-          isTouchDevice ? (
-            <button
-              className={`p-card__add-bag p-card__add-bag--touch${justAdded ? ' p-card__add-bag--added' : ''}`}
-              onClick={handleAddToCart}
-            >
-              {justAdded ? (
-                <>
-                  <FiCheck />
-                  <span>Added — {selectedSize}</span>
-                  {product.colors[selectedColor] && <span className="p-card__added-dot" style={{ backgroundColor: product.colors[selectedColor] }} />}
-                </>
-              ) : (
-                <>
-                  <FiShoppingBag />
-                  <span>Add to Bag</span>
-                </>
-              )}
-            </button>
-          ) : (
-            <motion.button
-              className={`p-card__add-bag${justAdded ? ' p-card__add-bag--added' : ''}`}
-              onClick={handleAddToCart}
-              initial={false}
-              animate={{ y: isHovered || justAdded ? 0 : '100%', opacity: isHovered || justAdded ? 1 : 0 }}
-              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            >
-              {justAdded ? (
-                <>
-                  <FiCheck />
-                  <span>Added — {selectedSize}</span>
-                  {product.colors[selectedColor] && <span className="p-card__added-dot" style={{ backgroundColor: product.colors[selectedColor] }} />}
-                </>
-              ) : (
-                <>
-                  <FiShoppingBag />
-                  <span>Add to Bag</span>
-                </>
-              )}
-            </motion.button>
-          )
+          <motion.button
+            className={`p-card__add-bag${justAdded ? ' p-card__add-bag--added' : ''}`}
+            onClick={handleAddToCart}
+            initial={false}
+            animate={isTouch ? { y: 0, opacity: 1 } : { y: isHovered || justAdded ? 0 : '100%', opacity: isHovered || justAdded ? 1 : 0 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+          >
+            {justAdded ? (
+              <>
+                <FiCheck />
+                <span>Added — {selectedSize}</span>
+                {product.colors[selectedColor] && <span className="p-card__added-dot" style={{ backgroundColor: product.colors[selectedColor] }} />}
+              </>
+            ) : (
+              <>
+                <FiShoppingBag />
+                <span>Add to Bag</span>
+              </>
+            )}
+          </motion.button>
         )}
       </div>
 

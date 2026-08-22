@@ -136,12 +136,11 @@
 
 .fp-card__add-bag:hover { background: rgba(196, 137, 106, 0.95); }
 
-.fp-card__add-bag--touch {
-  position: relative;
-  opacity: 1;
-  transform: none;
-  background: var(--deep-brown);
-  border-radius: 0;
+/* Touch devices — keep button visible at bottom of image */
+@media (hover: none), (pointer: coarse) {
+  .fp-card__fav {
+    opacity: 1 !important;
+  }
 }
 
 /* Added confirmation state */
