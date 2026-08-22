@@ -535,6 +535,17 @@
   box-shadow: none;
 }
 
+/* Custom size selected but measurements incomplete — looks disabled but
+   stays clickable so the shake feedback can run. Also pins the disabled
+   look on hover/active so the tap doesn't flash the enabled color. */
+.pd-add-to-bag--disabled,
+.pd-add-to-bag--disabled:hover,
+.pd-add-to-bag--disabled:active {
+  background: #d5d0cb;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
 /* ── Trust Signals ── */
 .pd-trust {
   display: flex;
