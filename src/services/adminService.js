@@ -1,5 +1,8 @@
 import { supabase } from '../lib/supabase'
 
+// Orders in these statuses don't count towards revenue
+export const REVENUE_EXCLUDED_STATUSES = ['cancelled', 'refunded', 'returned']
+
 // ── Dashboard Stats ──
 
 export const getStats = async () => {
@@ -11,7 +14,7 @@ export const getStats = async () => {
   ])
 
   const totalRevenue = (orders.data || [])
-    .filter(o => !['cancelled', 'refunded'].includes(o.status))
+    .filter(o => !REVENUE_EXCLUDED_STATUSES.includes(o.status))
     .reduce((sum, o) => sum + Number(o.total_amount || 0), 0)
 
   const activeProducts = (products.data || []).filter(p => p.is_active).length
@@ -69,6 +72,11 @@ export const updateOrderStatus = async (orderId, status, { fromStatus, trackingN
   // Set timestamps on forward transitions
   if (status === 'shipped') updates.shipped_at = new Date().toISOString()
   if (status === 'delivered') updates.delivered_at = new Date().toISOString()
+  // Disruption timestamps (used by Analytics time-series).
+  // 'returned' keeps shipped_at/delivered_at/tracking — the order WAS delivered.
+  if (status === 'cancelled') updates.cancelled_at = new Date().toISOString()
+  if (status === 'returned') updates.returned_at = new Date().toISOString()
+  if (status === 'refunded') updates.refunded_at = new Date().toISOString()
   if (trackingNumber !== undefined) updates.tracking_number = trackingNumber
 
   // Cleanup on backward transitions and cancellations
@@ -241,4 +249,122 @@ export const getUnreadCount = async () => {
 
   if (error) throw error
   return count || 0
+}
+
+// ── Users (via admin-users edge function) ──
+// auth.users can't be read with the anon key; the edge function verifies
+// the caller's JWT is the admin, then lists users with the service role.
+// functions.invoke auto-attaches the logged-in user's access token.
+
+export const listAuthUsers = async () => {
+  const { data, error } = await supabase.functions.invoke('admin-users', {
+    body: { action: 'list' },
+  })
+  if (error) throw error
+  if (data?.error) throw new Error(data.error)
+  return data.users || []
+}
+
+export const getAuthUser = async (userId) => {
+  const { data, error } = await supabase.functions.invoke('admin-users', {
+    body: { action: 'get', userId },
+  })
+  if (error) throw error
+  if (data?.error) throw new Error(data.error)
+  return data.user
+}
+
+// ── User drill-down (client-side, under admin RLS policies) ──
+
+export const getUserOrdersAdmin = async (userId, email) => {
+  let query = supabase
+    .from('orders')
+    .select('*, order_items(*, products(name, images))')
+    .order('created_at', { ascending: false })
+
+  // Include pre-signup guest orders matched by email. Skip the email clause
+  // if it contains characters that would break the PostgREST or-filter.
+  if (email && !/[,()]/.test(email)) {
+    query = query.or(`user_id.eq.${userId},customer_email.eq.${email}`)
+  } else {
+    query = query.eq('user_id', userId)
+  }
+
+  const { data, error } = await query
+  if (error) throw error
+  return data || []
+}
+
+export const getUserCartAdmin = async (userId) => {
+  const { data, error } = await supabase
+    .from('cart_items')
+    .select('*, products(name, images, price)')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return data || []
+}
+
+export const getUserFavoritesAdmin = async (userId) => {
+  const { data, error } = await supabase
+    .from('favorites')
+    .select('*, products(name, images, price, category)')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return data || []
+}
+
+export const getUserReviewsAdmin = async (userId) => {
+  const { data, error } = await supabase
+    .from('reviews')
+    .select('*, products(name, images)')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return data || []
+}
+
+// ── Analytics ──
+
+/**
+ * Fetch every row of a query by paging past PostgREST's row limit
+ * (default 1000 per request — without this, aggregates silently truncate).
+ * At current shop scale this is 1-2 requests; move the aggregation into a
+ * SECURITY DEFINER RPC if orders ever exceed ~10k rows.
+ */
+const fetchAllRows = async (buildQuery, pageSize = 1000) => {
+  const rows = []
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await buildQuery().range(from, from + pageSize - 1)
+    if (error) throw error
+    rows.push(...(data || []))
+    if (!data || data.length < pageSize) break
+  }
+  return rows
+}
+
+export const getAnalyticsOrders = async ({ since } = {}) => {
+  return fetchAllRows(() => {
+    let query = supabase
+      .from('orders')
+      .select('created_at, status, total_amount, payment_status, cancelled_at, returned_at, refunded_at, updated_at, user_id, customer_email')
+      .order('created_at', { ascending: true })
+    if (since) query = query.gte('created_at', since)
+    return query
+  })
+}
+
+export const getTopProductStats = async ({ since } = {}) => {
+  return fetchAllRows(() => {
+    let query = supabase
+      .from('order_items')
+      .select('product_id, quantity, total_price, product_snapshot, products(name, category), orders!inner(status, created_at)')
+      .not('orders.status', 'in', `(${REVENUE_EXCLUDED_STATUSES.join(',')})`)
+    if (since) query = query.gte('orders.created_at', since)
+    return query
+  })
 }

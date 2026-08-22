@@ -1,0 +1,72 @@
+/* Admin Users list — leans on the shared .adm-* design system */
+
+.adm-users__search-wrap {
+  position: relative;
+  flex: 1;
+  max-width: 340px;
+}
+
+.adm-users__search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.adm-users__search-input {
+  width: 100%;
+  padding-left: 36px;
+}
+
+.adm-users__row {
+  cursor: pointer;
+}
+
+.adm-users__identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.adm-users__avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--terracotta-light, #EFD9CC);
+  color: var(--deep-brown, #5C4033);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+.adm-users__identity-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.adm-users__name {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.adm-users__name .adm-badge {
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.adm-users__email {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

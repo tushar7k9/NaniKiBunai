@@ -47,6 +47,11 @@ import AdminOrders from './pages/admin/Orders'
 import AdminProducts from './pages/admin/Products'
 import AdminReviews from './pages/admin/Reviews'
 import AdminMessages from './pages/admin/Messages'
+import AdminUsers from './pages/admin/Users'
+import AdminUserDetail from './pages/admin/UserDetail'
+
+// Lazy-loaded: keeps recharts (~100KB) out of the storefront bundle
+const AdminAnalytics = React.lazy(() => import('./pages/admin/Analytics'))
 
 import './App.css'
 
@@ -97,8 +102,18 @@ function AppContent() {
         {/* Admin routes — separate layout, no Header/Footer */}
         <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
           <Route index element={<AdminDashboard />} />
+          <Route
+            path="analytics"
+            element={
+              <React.Suspense fallback={<div className="adm-loading"><div className="adm-spinner" /></div>}>
+                <AdminAnalytics />
+              </React.Suspense>
+            }
+          />
           <Route path="orders" element={<AdminOrders />} />
           <Route path="products" element={<AdminProducts />} />
+          <Route path="users" element={<AdminUsers />} />
+          <Route path="users/:userId" element={<AdminUserDetail />} />
           <Route path="reviews" element={<AdminReviews />} />
           <Route path="messages" element={<AdminMessages />} />
         </Route>

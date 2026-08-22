@@ -356,6 +356,7 @@
 .adm-badge--delivered { background: #D4EDDA; color: #155724; }
 .adm-badge--completed { background: #D4EDDA; color: #155724; }
 .adm-badge--cancelled { background: #F8D7DA; color: #721C24; }
+.adm-badge--returned { background: #FDEBD0; color: #8A4B08; }
 .adm-badge--refunded { background: #F8D7DA; color: #721C24; }
 .adm-badge--paid { background: #D4EDDA; color: #155724; }
 .adm-badge--failed { background: #F8D7DA; color: #721C24; }
@@ -364,6 +365,7 @@
 .adm-badge--replied { background: #D4EDDA; color: #155724; }
 .adm-badge--active { background: #D4EDDA; color: #155724; }
 .adm-badge--inactive { background: #F8D7DA; color: #721C24; }
+.adm-badge--admin { background: #E2D5F1; color: #5A3E85; }
 
 /* Buttons */
 .adm-btn {

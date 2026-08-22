@@ -21,6 +21,7 @@ const ORDER_STATUSES = [
   'delivered',
   'completed',
   'cancelled',
+  'returned',
   'refunded',
 ]
 
@@ -30,9 +31,10 @@ const STATUS_TRANSITIONS = {
   confirmed: ['processing', 'cancelled'],
   processing: ['shipped', 'cancelled'],
   shipped: ['delivered', 'processing'],
-  delivered: ['completed', 'shipped'],
+  delivered: ['completed', 'returned', 'shipped'],
   completed: [],
   cancelled: ['refunded'],
+  returned: ['refunded'],
   refunded: [],
 }
 
@@ -43,6 +45,7 @@ const TRACKING_VISIBLE_STATUSES = ['processing', 'shipped', 'delivered']
 const CONFIRM_TRANSITIONS = {
   'shipped→processing': 'This will clear the tracking number and shipment date. Continue?',
   'delivered→shipped': 'This will clear the delivery date. Continue?',
+  'delivered→returned': 'Mark this order as returned by the customer? It will be excluded from revenue. Continue?',
 }
 
 const formatDate = (d) =>
