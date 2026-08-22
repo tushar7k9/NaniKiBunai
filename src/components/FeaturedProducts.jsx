@@ -40,7 +40,7 @@ const FeaturedCard = ({ product, index, addToCart, isFavorite, toggleFavorite })
   const [isHovered, setIsHovered] = useState(false)
   const [justAdded, setJustAdded] = useState(false)
   const imageRef = useRef(null)
-  const { fly } = useFlyToCart()
+  const { notifyAdded } = useFlyToCart()
 
   const addedSize = product.sizes?.[0] || 'S'
   const addedColor = product.colors?.[0]
@@ -48,9 +48,12 @@ const FeaturedCard = ({ product, index, addToCart, isFavorite, toggleFavorite })
   const handleAddToCart = useCallback((e) => {
     e.stopPropagation()
     if (justAdded) return
-    if (imageRef.current) {
-      fly(product.images?.[0] || FALLBACK_IMG, imageRef.current.getBoundingClientRect())
-    }
+    notifyAdded({
+      imageSrc: product.images?.[0] || FALLBACK_IMG,
+      name: product.name,
+      imageRect: imageRef.current?.getBoundingClientRect(),
+      buttonRect: e.currentTarget?.getBoundingClientRect(),
+    })
     addToCart({
       ...product,
       quantity: 1,
@@ -59,7 +62,7 @@ const FeaturedCard = ({ product, index, addToCart, isFavorite, toggleFavorite })
     })
     setJustAdded(true)
     setTimeout(() => setJustAdded(false), 2000)
-  }, [justAdded, product, addToCart, fly, addedColor, addedSize])
+  }, [justAdded, product, addToCart, notifyAdded, addedColor, addedSize])
 
   const isOutOfStock = product.stock_quantity === 0
 

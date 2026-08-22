@@ -93,7 +93,12 @@ function AppContent() {
   // Get cart and favorites from context
   const { cart, getTotalItems, updateQuantity, removeFromCart } = useCart()
   const { favorites, getFavoritesCount } = useFavorites()
-  const { cartIconRef } = useFlyToCart()
+  const { cartIconRef, registerCartOpener } = useFlyToCart()
+
+  // Let the mobile "added to bag" toast open the cart drawer
+  useEffect(() => {
+    registerCartOpener(() => setIsCartOpen(true))
+  }, [registerCartOpener])
 
   return (
     <Router>

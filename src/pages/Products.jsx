@@ -107,15 +107,17 @@ const ProductCard = ({ product, addToCart, isFavorite, toggleFavorite, index }) 
   const [selectedSize, setSelectedSize] = useState(product.sizes?.[0] || 'S')
   const [justAdded, setJustAdded] = useState(false)
   const imageRef = useRef(null)
-  const { fly } = useFlyToCart()
+  const { notifyAdded } = useFlyToCart()
 
   const handleAddToCart = (e) => {
     e.stopPropagation()
     if (justAdded) return
-    if (imageRef.current) {
-      const rect = imageRef.current.getBoundingClientRect()
-      fly(product.images[0], rect)
-    }
+    notifyAdded({
+      imageSrc: product.images[0],
+      name: product.name,
+      imageRect: imageRef.current?.getBoundingClientRect(),
+      buttonRect: e.currentTarget?.getBoundingClientRect(),
+    })
     addToCart({
       ...product,
       quantity: 1,
