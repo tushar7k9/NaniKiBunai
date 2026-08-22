@@ -92,11 +92,11 @@ const Dashboard = () => {
                 <tbody>
                   {recentOrders.map(order => (
                     <tr key={order.id}>
-                      <td style={{ fontWeight: 500 }}>{order.order_number}</td>
-                      <td>{order.customer_email || '—'}</td>
-                      <td>₹{Number(order.total_amount).toLocaleString('en-IN')}</td>
-                      <td><span className={`adm-badge adm-badge--${order.status}`}>{order.status}</span></td>
-                      <td style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>{formatDate(order.created_at)}</td>
+                      <td style={{ fontWeight: 500 }} data-cell="title">{order.order_number}</td>
+                      <td data-label="Customer">{order.customer_email || '—'}</td>
+                      <td data-label="Total">₹{Number(order.total_amount).toLocaleString('en-IN')}</td>
+                      <td data-label="Status"><span className={`adm-badge adm-badge--${order.status}`}>{order.status}</span></td>
+                      <td style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }} data-label="Date">{formatDate(order.created_at)}</td>
                     </tr>
                   ))}
                 </tbody>

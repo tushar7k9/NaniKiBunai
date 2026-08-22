@@ -566,6 +566,12 @@
   max-height: 85vh;
   overflow-y: auto;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  /* Content scrolls, but no visible scrollbar strip */
+  scrollbar-width: none;
+}
+
+.adm-modal::-webkit-scrollbar {
+  display: none;
 }
 
 .adm-modal__header {
@@ -608,11 +614,14 @@
 
 .adm-modal__footer {
   padding: 16px 24px;
-  border-top: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
+  background: white;
+  /* Soft upward shadow instead of a divider line — reads as content
+     scrolling underneath the sticky footer */
+  box-shadow: 0 -8px 20px rgba(92, 64, 51, 0.09);
 }
 
 /* Form layout */
@@ -686,6 +695,152 @@
 
   .adm-table-wrap {
     overflow-x: auto;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   Mobile card mode — tables become card lists.
+   Cells are tagged in JSX:
+     data-cell="title"   → card headline (full width, bold)
+     data-label="X"      → label : value row
+     data-cell="expand"  → chevron pinned top-right
+     data-cell="actions" → button row at card bottom
+     data-row="detail"   → expanded colSpan rows (no card padding)
+   Untagged cells render as plain full-width blocks.
+   ═══════════════════════════════════════════ */
+@media (max-width: 640px) {
+  .adm-table-wrap {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    overflow: visible;
+  }
+
+  .adm-table,
+  .adm-table tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .adm-table thead {
+    display: none;
+  }
+
+  .adm-table tr {
+    display: block;
+    position: relative;
+    background: white;
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+
+  .adm-table tr:hover td {
+    background: transparent;
+  }
+
+  .adm-table td {
+    display: block;
+    width: 100%;
+    padding: 3px 0;
+    border-bottom: none;
+  }
+
+  .adm-table td[data-label] {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .adm-table td[data-label]::before {
+    content: attr(data-label);
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  .adm-table td[data-cell="title"] {
+    font-weight: 600;
+    font-size: 0.95rem;
+    padding-right: 32px;
+    padding-bottom: 8px;
+  }
+
+  .adm-table td[data-cell="expand"] {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: auto;
+    padding: 0;
+    color: var(--text-muted);
+  }
+
+  .adm-table td[data-cell="actions"] {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--border-subtle);
+  }
+
+  /* Expanded detail rows (colSpan cells with their own inner layout) */
+  .adm-table tr[data-row="detail"] {
+    padding: 0;
+    overflow: hidden;
+    margin-top: -12px; /* visually attach to the card above */
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+  }
+
+  .adm-table tr[data-row="detail"] > td {
+    padding: 0;
+  }
+
+  /* Filters stack full-width */
+  .adm-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .adm-filters .adm-select,
+  .adm-filters .adm-input {
+    width: 100%;
+  }
+
+  /* Pagination: comfortable touch targets */
+  .adm-pagination {
+    flex-wrap: wrap;
+    border-top: none;
+    padding: 8px 0 16px;
+  }
+
+  .adm-pagination__btn {
+    min-width: 38px;
+    min-height: 38px;
+  }
+
+  /* Modal becomes a bottom sheet */
+  .adm-modal-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .adm-modal {
+    max-width: none;
+    max-height: 94vh;
+    border-radius: 18px 18px 0 0;
+  }
+
+  .adm-modal__footer {
+    position: sticky;
+    bottom: 0;
+    background: white;
   }
 }
 

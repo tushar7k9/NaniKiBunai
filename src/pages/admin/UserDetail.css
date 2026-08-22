@@ -203,4 +203,9 @@
   .adm-user-detail__profile {
     flex-direction: column;
   }
+
+  /* Card mode zeroes detail-row padding; this row's items need it back */
+  .adm-table tr.adm-user-detail__order-items[data-row="detail"] > td {
+    padding: 12px 16px;
+  }
 }

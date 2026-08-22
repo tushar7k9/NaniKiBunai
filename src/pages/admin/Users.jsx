@@ -175,7 +175,7 @@ const Users = () => {
                           className="adm-users__row"
                           onClick={() => navigate(`/admin/users/${u.id}`)}
                         >
-                          <td>
+                          <td data-cell="title">
                             <div className="adm-users__identity">
                               <div className="adm-users__avatar">
                                 {(displayName(u)[0] !== '—' && displayName(u)[0]) ||
@@ -192,16 +192,16 @@ const Users = () => {
                               </div>
                             </div>
                           </td>
-                          <td>{formatDate(u.created_at)}</td>
-                          <td>{formatDate(u.last_sign_in_at)}</td>
-                          <td style={{ textTransform: 'capitalize' }}>{u.provider}</td>
-                          <td>
+                          <td data-label="Signed Up">{formatDate(u.created_at)}</td>
+                          <td data-label="Last Sign-in">{formatDate(u.last_sign_in_at)}</td>
+                          <td style={{ textTransform: 'capitalize' }} data-label="Provider">{u.provider}</td>
+                          <td data-label="Confirmed">
                             <span className={`adm-badge adm-badge--${u.email_confirmed_at ? 'active' : 'pending'}`}>
                               {u.email_confirmed_at ? 'Confirmed' : 'Pending'}
                             </span>
                           </td>
-                          <td>{stats.orderCount}</td>
-                          <td style={{ fontWeight: 500 }}>{formatCurrency(stats.lifetimeValue)}</td>
+                          <td data-label="Orders">{stats.orderCount}</td>
+                          <td style={{ fontWeight: 500 }} data-label="Lifetime Value">{formatCurrency(stats.lifetimeValue)}</td>
                         </tr>
                       )
                     })}

@@ -212,23 +212,23 @@ const UserDetail = () => {
                         className="adm-user-detail__order-row"
                         onClick={() => toggleOrder(order.id)}
                       >
-                        <td style={{ width: 30 }}>
+                        <td style={{ width: 30 }} data-cell="expand">
                           {expanded ? <FiChevronUp /> : <FiChevronDown />}
                         </td>
-                        <td style={{ fontWeight: 500 }}>
+                        <td style={{ fontWeight: 500 }} data-cell="title">
                           {order.order_number}
                           {!order.user_id && (
                             <span className="adm-user-detail__guest-tag">guest</span>
                           )}
                         </td>
-                        <td>{formatDate(order.created_at)}</td>
-                        <td>{(order.order_items || []).length}</td>
-                        <td>{formatCurrency(order.total_amount)}</td>
-                        <td><span className={`adm-badge adm-badge--${order.status}`}>{order.status}</span></td>
-                        <td><span className={`adm-badge adm-badge--${order.payment_status}`}>{order.payment_status}</span></td>
+                        <td data-label="Date">{formatDate(order.created_at)}</td>
+                        <td data-label="Items">{(order.order_items || []).length}</td>
+                        <td data-label="Total">{formatCurrency(order.total_amount)}</td>
+                        <td data-label="Status"><span className={`adm-badge adm-badge--${order.status}`}>{order.status}</span></td>
+                        <td data-label="Payment"><span className={`adm-badge adm-badge--${order.payment_status}`}>{order.payment_status}</span></td>
                       </tr>
                       {expanded && (
-                        <tr className="adm-user-detail__order-items">
+                        <tr className="adm-user-detail__order-items" data-row="detail">
                           <td colSpan={7}>
                             <div className="adm-user-detail__items">
                               {(order.order_items || []).map((item) => {
@@ -287,7 +287,7 @@ const UserDetail = () => {
               <tbody>
                 {cart.map((item) => (
                   <tr key={item.id}>
-                    <td>
+                    <td data-cell="title">
                       <div className="adm-user-detail__product-cell">
                         {item.products?.images?.[0] && (
                           <img src={item.products.images[0]} alt="" className="adm-user-detail__item-img" />
@@ -295,10 +295,10 @@ const UserDetail = () => {
                         <span>{item.products?.name || 'Product'}</span>
                       </div>
                     </td>
-                    <td>{[item.selected_color, item.selected_size].filter(Boolean).join(' · ') || '—'}</td>
-                    <td>{item.quantity}</td>
-                    <td>{formatCurrency(item.price_snapshot ?? item.products?.price ?? 0)}</td>
-                    <td>{formatDate(item.created_at)}</td>
+                    <td data-label="Variant">{[item.selected_color, item.selected_size].filter(Boolean).join(' · ') || '—'}</td>
+                    <td data-label="Qty">{item.quantity}</td>
+                    <td data-label="Price">{formatCurrency(item.price_snapshot ?? item.products?.price ?? 0)}</td>
+                    <td data-label="Added">{formatDate(item.created_at)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -326,7 +326,7 @@ const UserDetail = () => {
               <tbody>
                 {favorites.map((fav) => (
                   <tr key={fav.id}>
-                    <td>
+                    <td data-cell="title">
                       <div className="adm-user-detail__product-cell">
                         {fav.products?.images?.[0] && (
                           <img src={fav.products.images[0]} alt="" className="adm-user-detail__item-img" />
@@ -334,9 +334,9 @@ const UserDetail = () => {
                         <span>{fav.products?.name || 'Product'}</span>
                       </div>
                     </td>
-                    <td style={{ textTransform: 'capitalize' }}>{fav.products?.category || '—'}</td>
-                    <td>{formatCurrency(fav.products?.price ?? 0)}</td>
-                    <td>{formatDate(fav.created_at)}</td>
+                    <td style={{ textTransform: 'capitalize' }} data-label="Category">{fav.products?.category || '—'}</td>
+                    <td data-label="Price">{formatCurrency(fav.products?.price ?? 0)}</td>
+                    <td data-label="Added">{formatDate(fav.created_at)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -365,8 +365,8 @@ const UserDetail = () => {
               <tbody>
                 {reviews.map((review) => (
                   <tr key={review.id}>
-                    <td>{review.products?.name || '—'}</td>
-                    <td><Stars rating={review.rating} /></td>
+                    <td data-cell="title">{review.products?.name || '—'}</td>
+                    <td data-label="Rating"><Stars rating={review.rating} /></td>
                     <td className="adm-user-detail__review-text">
                       {review.title && <strong>{review.title} — </strong>}
                       {review.review_text
@@ -375,12 +375,12 @@ const UserDetail = () => {
                           : review.review_text
                         : '—'}
                     </td>
-                    <td>
+                    <td data-label="Status">
                       <span className={`adm-badge adm-badge--${review.is_approved ? 'active' : 'pending'}`}>
                         {review.is_approved ? 'Approved' : 'Pending'}
                       </span>
                     </td>
-                    <td>{formatDate(review.created_at)}</td>
+                    <td data-label="Date">{formatDate(review.created_at)}</td>
                   </tr>
                 ))}
               </tbody>

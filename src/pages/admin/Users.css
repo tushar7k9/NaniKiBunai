@@ -70,3 +70,9 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+@media (max-width: 640px) {
+  .adm-users__search-wrap {
+    max-width: none;
+  }
+}

@@ -135,13 +135,13 @@ const Messages = () => {
                       className={`adm-messages__row${isNew ? ' adm-messages__row--new' : ''}${isExpanded ? ' adm-messages__row--expanded' : ''}`}
                       onClick={() => handleRowClick(msg)}
                     >
-                      <td>
+                      <td data-cell="title">
                         <span className={`adm-messages__name${isNew ? ' adm-messages__name--bold' : ''}`}>
                           {msg.name}
                         </span>
                       </td>
-                      <td className="adm-messages__email">{msg.email}</td>
-                      <td>
+                      <td className="adm-messages__email" data-label="Email">{msg.email}</td>
+                      <td data-label="Subject">
                         {msg.subject ? (
                           <span className={isNew ? 'adm-messages__subject--bold' : ''}>
                             {msg.subject}
@@ -150,11 +150,11 @@ const Messages = () => {
                           <span className="adm-messages__no-subject">No subject</span>
                         )}
                       </td>
-                      <td className="adm-messages__date">{formatDate(msg.created_at)}</td>
-                      <td>
+                      <td className="adm-messages__date" data-label="Date">{formatDate(msg.created_at)}</td>
+                      <td data-label="Status">
                         <span className={`adm-badge adm-badge--${msg.status}`}>{msg.status}</span>
                       </td>
-                      <td className="adm-messages__chevron-cell">
+                      <td className="adm-messages__chevron-cell" data-cell="expand">
                         <span className="adm-messages__chevron">
                           {isExpanded ? <FiChevronUp /> : <FiChevronDown />}
                         </span>
@@ -163,7 +163,7 @@ const Messages = () => {
 
                     {/* Expanded row */}
                     {isExpanded && (
-                      <tr className="adm-messages__expanded-row">
+                      <tr className="adm-messages__expanded-row" data-row="detail">
                         <td colSpan={6}>
                           <div className="adm-messages__detail">
                             {/* Message body */}
