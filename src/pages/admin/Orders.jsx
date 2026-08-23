@@ -6,6 +6,9 @@ import {
   FiChevronUp,
   FiTruck,
   FiExternalLink,
+  FiCopy,
+  FiCheck,
+  FiClock,
 } from 'react-icons/fi'
 import * as adminService from '../../services/adminService'
 import './Orders.css'
@@ -48,6 +51,45 @@ const CONFIRM_TRANSITIONS = {
   'delivered→returned': 'Mark this order as returned by the customer? It will be excluded from revenue. Continue?',
 }
 
+// Backward transitions render as ghost buttons in the detail actions
+const BACKWARD_TRANSITIONS = ['shipped→processing', 'delivered→shipped']
+
+// Human labels for status action buttons
+const ACTION_LABELS = {
+  confirmed: 'Confirm order',
+  processing: 'Start processing',
+  shipped: 'Mark shipped',
+  delivered: 'Mark delivered',
+  completed: 'Complete',
+  cancelled: 'Cancel order',
+  returned: 'Mark returned',
+  refunded: 'Mark refunded',
+}
+
+// One-click forward step per status, shown directly on the row.
+// Shipping needs a tracking number, so it expands the row instead.
+const QUICK_ACTIONS = {
+  pending: { to: 'confirmed', label: 'Confirm' },
+  confirmed: { to: 'processing', label: 'Process' },
+  processing: { to: 'shipped', label: 'Ship…', expand: true },
+  shipped: { to: 'delivered', label: 'Delivered' },
+  delivered: { to: 'completed', label: 'Complete' },
+}
+
+// Orders still waiting on the admin after this long are highlighted
+const STALE_STATUSES = ['pending', 'confirmed']
+const STALE_AFTER_MS = 48 * 60 * 60 * 1000
+
+const timeAgo = (d) => {
+  const mins = Math.floor((Date.now() - new Date(d).getTime()) / 60000)
+  if (mins < 60) return `${Math.max(1, mins)}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  if (days < 30) return `${days}d ago`
+  return `${Math.floor(days / 30)}mo ago`
+}
+
 const formatDate = (d) =>
   new Date(d).toLocaleDateString('en-IN', {
     day: 'numeric',
@@ -68,7 +110,16 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
   const [trackingMsg, setTrackingMsg] = useState('')
   const [pendingShipment, setPendingShipment] = useState(false)
   const [confirmTransition, setConfirmTransition] = useState(null) // { to, message }
+  const [copiedField, setCopiedField] = useState(null)
   const trackingInputRef = useRef(null)
+
+  const copyToClipboard = async (field, value) => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopiedField(field)
+      setTimeout(() => setCopiedField(null), 1600)
+    } catch { /* clipboard unavailable — ignore */ }
+  }
 
   const isTerminal = TERMINAL_STATUSES.includes(status)
   const showTracking = TRACKING_VISIBLE_STATUSES.includes(status)
@@ -96,8 +147,7 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
     }
   }
 
-  const handleStatusChange = async (e) => {
-    const newStatus = e.target.value
+  const handleStatusChange = async (newStatus) => {
     if (newStatus === status) return
 
     // Shipped requires tracking number
@@ -256,12 +306,26 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
                   <>
                     <br />
                     <span style={{ color: 'var(--text-muted)' }}>{order.customer_phone}</span>
+                    <button
+                      className="adm-orders__copy-btn"
+                      title="Copy phone"
+                      onClick={() => copyToClipboard('phone', order.customer_phone)}
+                    >
+                      {copiedField === 'phone' ? <FiCheck /> : <FiCopy />}
+                    </button>
                   </>
                 )}
                 {order.customer_email && (
                   <>
                     <br />
                     <span style={{ color: 'var(--text-muted)' }}>{order.customer_email}</span>
+                    <button
+                      className="adm-orders__copy-btn"
+                      title="Copy email"
+                      onClick={() => copyToClipboard('email', order.customer_email)}
+                    >
+                      {copiedField === 'email' ? <FiCheck /> : <FiCopy />}
+                    </button>
                   </>
                 )}
               </p>
@@ -348,21 +412,29 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
                 {status.charAt(0).toUpperCase() + status.slice(1)} — Final
               </span>
             ) : (
-              <select
-                className="adm-select"
-                value={status}
-                onChange={handleStatusChange}
-                disabled={savingStatus || pendingShipment || !!confirmTransition}
-              >
-                <option value={status}>
-                  {status.charAt(0).toUpperCase() + status.slice(1)}
-                </option>
-                {allowedNextStatuses.map((s) => (
-                  <option key={s} value={s}>
-                    {s.charAt(0).toUpperCase() + s.slice(1)}
-                  </option>
-                ))}
-              </select>
+              <div className="adm-orders__status-actions">
+                {allowedNextStatuses.map((s) => {
+                  const isBackward = BACKWARD_TRANSITIONS.includes(`${status}→${s}`)
+                  const variant =
+                    s === 'cancelled'
+                      ? 'adm-btn--danger'
+                      : isBackward
+                        ? 'adm-btn--ghost'
+                        : s === 'returned' || s === 'refunded'
+                          ? 'adm-btn--secondary'
+                          : 'adm-btn--primary'
+                  return (
+                    <button
+                      key={s}
+                      className={`adm-btn ${variant} adm-btn--sm`}
+                      onClick={() => handleStatusChange(s)}
+                      disabled={savingStatus || pendingShipment || !!confirmTransition}
+                    >
+                      {ACTION_LABELS[s] || s}
+                    </button>
+                  )
+                })}
+              </div>
             )}
             {savingStatus && <span className="adm-orders__saving">Saving…</span>}
             {statusMsg && (
@@ -480,6 +552,20 @@ const Orders = () => {
   const [search, setSearch] = useState('')
   const [searchInput, setSearchInput] = useState('')
   const [expandedIds, setExpandedIds] = useState(new Set())
+  const [statusCounts, setStatusCounts] = useState(null)
+  const [quickSavingId, setQuickSavingId] = useState(null)
+
+  const loadCounts = useCallback(async () => {
+    try {
+      setStatusCounts(await adminService.getOrderStatusCounts())
+    } catch (err) {
+      console.error('Failed to load order counts:', err)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadCounts()
+  }, [loadCounts])
 
   const loadOrders = useCallback(async () => {
     setLoading(true)
@@ -528,6 +614,29 @@ const Orders = () => {
     setOrders((prev) =>
       prev.map((o) => (o.id === orderId ? { ...o, ...updatedOrder } : o))
     )
+    loadCounts()
+  }
+
+  // One-click forward step from the row. Shipping needs a tracking number,
+  // so it expands the row to the full actions instead.
+  const handleQuickAction = async (order) => {
+    const quick = QUICK_ACTIONS[order.status]
+    if (!quick) return
+    if (quick.expand) {
+      setExpandedIds((prev) => new Set(prev).add(order.id))
+      return
+    }
+    setQuickSavingId(order.id)
+    try {
+      const updated = await adminService.updateOrderStatus(order.id, quick.to, {
+        fromStatus: order.status,
+      })
+      handleStatusUpdate(order.id, updated)
+    } catch (err) {
+      console.error('Quick status update failed:', err)
+    } finally {
+      setQuickSavingId(null)
+    }
   }
 
   const handleTrackingUpdate = (orderId, updatedOrder) => {
@@ -555,21 +664,27 @@ const Orders = () => {
         </div>
       </div>
 
+      {/* Status tabs — live counts show where the work is */}
+      <div className="adm-orders__tabs">
+        {ORDER_STATUSES.map((s) => {
+          const count = s === 'all' ? statusCounts?.all : statusCounts?.[s]
+          // hide empty statuses to reduce clutter (keep 'all' and the active tab)
+          if (s !== 'all' && s !== statusFilter && statusCounts && !count) return null
+          return (
+            <button
+              key={s}
+              className={`adm-orders__tab${statusFilter === s ? ' adm-orders__tab--active' : ''}`}
+              onClick={() => setStatusFilter(s)}
+            >
+              {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
+              {count != null && <span className="adm-orders__tab-count">{count}</span>}
+            </button>
+          )
+        })}
+      </div>
+
       {/* Filters */}
       <div className="adm-filters">
-        {/* Status */}
-        <select
-          className="adm-select"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          {ORDER_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {s === 'all' ? 'All Statuses' : s.charAt(0).toUpperCase() + s.slice(1)}
-            </option>
-          ))}
-        </select>
-
         {/* Search */}
         <form
           className="adm-orders__search-form"
@@ -634,6 +749,7 @@ const Orders = () => {
                   <th>Status</th>
                   <th>Payment</th>
                   <th></th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -643,20 +759,30 @@ const Orders = () => {
                     (sum, i) => sum + (i.quantity || 1),
                     0
                   )
+                  const quick = QUICK_ACTIONS[order.status]
+                  const isStale =
+                    STALE_STATUSES.includes(order.status) &&
+                    Date.now() - new Date(order.created_at).getTime() > STALE_AFTER_MS
                   return (
                     <React.Fragment key={order.id}>
                       <tr
-                        className={`adm-orders__row${isExpanded ? ' adm-orders__row--expanded' : ''}`}
+                        className={`adm-orders__row${isExpanded ? ' adm-orders__row--expanded' : ''}${isStale ? ' adm-orders__row--stale' : ''}`}
                         onClick={() => toggleRow(order.id)}
                       >
                         <td className="adm-orders__order-num" data-cell="title">
                           {order.order_number || order.id.slice(0, 8).toUpperCase()}
+                          {isStale && (
+                            <span className="adm-orders__stale-tag" title="Waiting for action for over 48 hours">
+                              <FiClock /> needs action
+                            </span>
+                          )}
                         </td>
                         <td className="adm-orders__email" data-label="Customer">
                           {order.customer_email || '—'}
                         </td>
                         <td className="adm-orders__date" data-label="Date">
                           {formatDate(order.created_at)}
+                          <span className="adm-orders__age">{timeAgo(order.created_at)}</span>
                         </td>
                         <td className="adm-orders__count" data-label="Items">{itemCount}</td>
                         <td className="adm-orders__total" data-label="Total">
@@ -674,6 +800,20 @@ const Orders = () => {
                             {order.payment_status || 'pending'}
                           </span>
                         </td>
+                        <td className="adm-orders__quick-cell" data-cell="actions">
+                          {quick && !isExpanded && (
+                            <button
+                              className="adm-btn adm-btn--secondary adm-btn--sm adm-orders__quick-btn"
+                              disabled={quickSavingId === order.id}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleQuickAction(order)
+                              }}
+                            >
+                              {quickSavingId === order.id ? 'Saving…' : quick.label}
+                            </button>
+                          )}
+                        </td>
                         <td className="adm-orders__chevron-cell" data-cell="expand">
                           {isExpanded ? (
                             <FiChevronUp className="adm-orders__chevron" />
@@ -685,7 +825,7 @@ const Orders = () => {
 
                       {isExpanded && (
                         <tr className="adm-orders__detail-row" data-row="detail">
-                          <td colSpan={8} className="adm-orders__detail-cell">
+                          <td colSpan={9} className="adm-orders__detail-cell">
                             <OrderDetail
                               order={order}
                               onStatusUpdate={handleStatusUpdate}

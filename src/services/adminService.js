@@ -55,6 +55,21 @@ export const getAllOrders = async ({ status, search, page = 1, limit = 20 } = {}
   return { orders: data || [], total: count || 0, page, totalPages: Math.ceil((count || 0) / limit) }
 }
 
+/** Per-status order counts for the admin Orders tabs (runtime-calls fetchAllRows). */
+export const getOrderStatusCounts = async () => {
+  const rows = await fetchAllRows(() =>
+    supabase.from('orders').select('status').order('created_at', { ascending: true })
+  )
+  return rows.reduce(
+    (acc, row) => {
+      acc[row.status] = (acc[row.status] || 0) + 1
+      acc.all += 1
+      return acc
+    },
+    { all: 0 }
+  )
+}
+
 export const getOrderDetails = async (orderId) => {
   const { data, error } = await supabase
     .from('orders')
@@ -249,6 +264,31 @@ export const getUnreadCount = async () => {
 
   if (error) throw error
   return count || 0
+}
+
+// ── Store Settings ──
+
+export const getStoreSettings = async () => {
+  const { data, error } = await supabase
+    .from('store_settings')
+    .select('*')
+    .eq('id', 1)
+    .maybeSingle()
+
+  if (error) throw error
+  return data
+}
+
+export const updateStoreSettings = async (patch) => {
+  const { data, error } = await supabase
+    .from('store_settings')
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq('id', 1)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
 }
 
 // ── Users (via admin-users edge function) ──

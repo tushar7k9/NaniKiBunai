@@ -9,6 +9,7 @@ import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-route
 
 // Context Providers
 import { AuthProvider } from './contexts/AuthContext'
+import { StoreSettingsProvider } from './contexts/StoreSettingsContext'
 import { ProductsProvider } from './contexts/ProductsContext'
 import { CartProvider } from './contexts/CartContext'
 import { FavoritesProvider } from './contexts/FavoritesContext'
@@ -18,6 +19,8 @@ import { FlyToCartProvider, useFlyToCart } from './components/FlyToCart'
 import Header from './components/Header'
 import Cart from './components/Cart'
 import SearchOverlay from './components/SearchOverlay'
+import MaintenanceGate from './components/MaintenanceGate'
+import AnnouncementBanner from './components/AnnouncementBanner'
 import Hero from './components/Hero'
 import Categories from './components/Categories'
 import FeaturedProducts from './components/FeaturedProducts'
@@ -39,19 +42,31 @@ import Profile from './pages/Profile'
 import Checkout from './pages/Checkout'
 import Orders from './pages/Orders'
 
-// Admin
+// Admin — all lazy-loaded: shoppers never download the admin area
+// (pages, admin CSS, recharts). Loaded on demand when the admin logs in.
 import AdminRoute from './components/AdminRoute'
-import AdminLayout from './pages/admin/AdminLayout'
-import AdminDashboard from './pages/admin/Dashboard'
-import AdminOrders from './pages/admin/Orders'
-import AdminProducts from './pages/admin/Products'
-import AdminReviews from './pages/admin/Reviews'
-import AdminMessages from './pages/admin/Messages'
-import AdminUsers from './pages/admin/Users'
-import AdminUserDetail from './pages/admin/UserDetail'
-
-// Lazy-loaded: keeps recharts (~100KB) out of the storefront bundle
+const AdminLayout = React.lazy(() => import('./pages/admin/AdminLayout'))
+const AdminDashboard = React.lazy(() => import('./pages/admin/Dashboard'))
+const AdminOrders = React.lazy(() => import('./pages/admin/Orders'))
+const AdminProducts = React.lazy(() => import('./pages/admin/Products'))
+const AdminReviews = React.lazy(() => import('./pages/admin/Reviews'))
+const AdminMessages = React.lazy(() => import('./pages/admin/Messages'))
+const AdminUsers = React.lazy(() => import('./pages/admin/Users'))
+const AdminUserDetail = React.lazy(() => import('./pages/admin/UserDetail'))
 const AdminAnalytics = React.lazy(() => import('./pages/admin/Analytics'))
+const AdminSettings = React.lazy(() => import('./pages/admin/Settings'))
+
+// Inline styles: the admin CSS itself is lazy, so the fallback can't rely on it
+const AdminFallback = () => (
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+    <div style={{
+      width: 28, height: 28, borderRadius: '50%',
+      border: '3px solid rgba(196, 137, 106, 0.25)', borderTopColor: '#C4896A',
+      animation: 'spin 0.6s linear infinite',
+    }} />
+    <style>{'@keyframes spin { to { transform: rotate(360deg) } }'}</style>
+  </div>
+)
 
 import './App.css'
 
@@ -105,27 +120,31 @@ function AppContent() {
       <ScrollToTop />
       <Routes>
         {/* Admin routes — separate layout, no Header/Footer */}
-        <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
-          <Route index element={<AdminDashboard />} />
-          <Route
-            path="analytics"
-            element={
-              <React.Suspense fallback={<div className="adm-loading"><div className="adm-spinner" /></div>}>
-                <AdminAnalytics />
+        <Route
+          path="/admin"
+          element={
+            <AdminRoute>
+              <React.Suspense fallback={<AdminFallback />}>
+                <AdminLayout />
               </React.Suspense>
-            }
-          />
+            </AdminRoute>
+          }
+        >
+          <Route index element={<AdminDashboard />} />
+          <Route path="analytics" element={<AdminAnalytics />} />
           <Route path="orders" element={<AdminOrders />} />
           <Route path="products" element={<AdminProducts />} />
           <Route path="users" element={<AdminUsers />} />
           <Route path="users/:userId" element={<AdminUserDetail />} />
           <Route path="reviews" element={<AdminReviews />} />
           <Route path="messages" element={<AdminMessages />} />
+          <Route path="settings" element={<AdminSettings />} />
         </Route>
 
         {/* Store routes */}
         <Route path="*" element={
           <div className="App">
+            <AnnouncementBanner />
             <Header
               cartCount={getTotalItems()}
               favoritesCount={getFavoritesCount()}
@@ -145,19 +164,21 @@ function AppContent() {
               updateQuantity={updateQuantity}
               removeFromCart={removeFromCart}
             />
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/products" element={<Products />} />
-              <Route path="/product/:id" element={<ProductDetail />} />
-              <Route path="/favorites" element={<Favorites />} />
-              <Route path="/collections" element={<Collections />} />
-              <Route path="/contact" element={<Contact />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/checkout" element={<Checkout />} />
-              <Route path="/orders" element={<Orders />} />
-            </Routes>
+            <MaintenanceGate>
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/products" element={<Products />} />
+                <Route path="/product/:id" element={<ProductDetail />} />
+                <Route path="/favorites" element={<Favorites />} />
+                <Route path="/collections" element={<Collections />} />
+                <Route path="/contact" element={<Contact />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/checkout" element={<Checkout />} />
+                <Route path="/orders" element={<Orders />} />
+              </Routes>
+            </MaintenanceGate>
             <Footer />
           </div>
         } />
@@ -177,15 +198,17 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <ProductsProvider>
-        <CartProvider>
-          <FavoritesProvider>
-            <FlyToCartProvider>
-              <AppContent />
-            </FlyToCartProvider>
-          </FavoritesProvider>
-        </CartProvider>
-      </ProductsProvider>
+      <StoreSettingsProvider>
+        <ProductsProvider>
+          <CartProvider>
+            <FavoritesProvider>
+              <FlyToCartProvider>
+                <AppContent />
+              </FlyToCartProvider>
+            </FavoritesProvider>
+          </CartProvider>
+        </ProductsProvider>
+      </StoreSettingsProvider>
     </AuthProvider>
   )
 }

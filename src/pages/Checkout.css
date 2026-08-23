@@ -468,7 +468,7 @@
 /* ── Summary (right) ── */
 .co-summary {
   position: sticky;
-  top: 100px;
+  top: calc(100px + var(--banner-h, 0px));
   background: white;
   border-radius: 14px;
   border: 1px solid var(--border-subtle);

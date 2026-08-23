@@ -421,6 +421,132 @@
   width: 220px;
 }
 
+/* ── Status tabs ── */
+.adm-orders__tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+
+.adm-orders__tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.adm-orders__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border: 1.5px solid var(--border-subtle);
+  border-radius: 100px;
+  background: white;
+  color: var(--text-light);
+  font-size: 0.82rem;
+  font-weight: 500;
+  font-family: var(--font-body);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.adm-orders__tab:hover {
+  border-color: var(--terracotta-light);
+  color: var(--deep-brown);
+}
+
+.adm-orders__tab--active {
+  background: var(--deep-brown);
+  border-color: var(--deep-brown);
+  color: white;
+}
+
+.adm-orders__tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 100px;
+  background: rgba(92, 64, 51, 0.08);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.adm-orders__tab--active .adm-orders__tab-count {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* ── Row extras: age, stale highlight, quick action ── */
+.adm-orders__age {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.adm-orders__row--stale td:first-child {
+  box-shadow: inset 3px 0 0 #D4AF37;
+}
+
+.adm-orders__stale-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 100px;
+  background: #FEF3CD;
+  color: #856404;
+  font-size: 0.66rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  vertical-align: middle;
+}
+
+.adm-orders__quick-cell {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.adm-orders__quick-btn {
+  min-width: 86px;
+}
+
+/* ── Detail: status action buttons + copy buttons ── */
+.adm-orders__status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.adm-orders__copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-left: 6px;
+  border: none;
+  border-radius: 6px;
+  background: var(--section-bg-alt);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.7rem;
+  vertical-align: middle;
+  transition: all 0.15s ease;
+}
+
+.adm-orders__copy-btn:hover {
+  background: var(--terracotta-light);
+  color: var(--deep-brown);
+}
+
 /* ── Responsive ── */
 @media (max-width: 900px) {
   .adm-orders__email {
