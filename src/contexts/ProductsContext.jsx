@@ -1,5 +1,6 @@
-import React, { createContext, useState, useEffect } from 'react'
+import React, { createContext, useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { useStoreSettings } from '../hooks/useStoreSettings'
 
 export const ProductsContext = createContext()
 
@@ -199,6 +200,26 @@ export const ProductsProvider = ({ children }) => {
   useEffect(() => {
     loadProducts()
   }, [])
+
+  /**
+   * Live catalog updates: any product change (deactivation, stock, price)
+   * bumps store_settings.catalog_version via a DB trigger, which reaches
+   * every open tab through the settings Realtime channel — refetch the
+   * catalog silently so shoppers never act on stale availability.
+   */
+  const { settings } = useStoreSettings()
+  const lastCatalogVersion = useRef(null)
+  useEffect(() => {
+    if (lastCatalogVersion.current === null) {
+      // initial value — mount load already fetched the catalog
+      lastCatalogVersion.current = settings.catalog_version
+      return
+    }
+    if (settings.catalog_version !== lastCatalogVersion.current) {
+      lastCatalogVersion.current = settings.catalog_version
+      loadProducts(true)
+    }
+  }, [settings.catalog_version])
 
   /**
    * Load products from Supabase or static data

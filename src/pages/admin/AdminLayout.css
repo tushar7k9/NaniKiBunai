@@ -173,6 +173,10 @@
 /* ── Content ── */
 .adm-content {
   flex: 1;
+  /* Flex items default to min-width:auto, which lets wide descendants
+     (e.g. the scrollable orders tab row) stretch the page instead of
+     scrolling inside their own container */
+  min-width: 0;
   margin-left: 250px;
   padding: 32px;
   min-height: 100vh;
@@ -302,7 +306,16 @@
   background: white;
   border-radius: 12px;
   border: 1px solid var(--border-subtle);
-  overflow: hidden;
+  /* Wide tables scroll inside the card at ANY width instead of
+     stretching the whole page (previously only handled below 768px) */
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.adm-table-wrap::-webkit-scrollbar {
+  display: none;
 }
 
 .adm-table {
@@ -691,10 +704,6 @@
 
   .adm-form-grid {
     grid-template-columns: 1fr;
-  }
-
-  .adm-table-wrap {
-    overflow-x: auto;
   }
 }
 

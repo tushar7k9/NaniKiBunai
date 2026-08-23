@@ -117,10 +117,33 @@ CREATE TABLE IF NOT EXISTS store_settings (
   banner_enabled BOOLEAN NOT NULL DEFAULT false,
   banner_text TEXT DEFAULT '' CHECK (char_length(banner_text) <= 250),
   theme TEXT NOT NULL DEFAULT 'default' CHECK (theme IN ('default', 'diwali', 'holiday')),
+  -- Bumped by a trigger on any products change; clients watch it via the
+  -- store_settings Realtime channel and refetch the catalog. (Realtime on
+  -- products directly can't deliver deactivations to anonymous clients:
+  -- an inactive row no longer passes the public SELECT policy.)
+  catalog_version BIGINT NOT NULL DEFAULT 0,
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
 INSERT INTO store_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
+-- Signal catalog changes to all connected clients
+CREATE OR REPLACE FUNCTION bump_catalog_version()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  UPDATE store_settings SET catalog_version = catalog_version + 1 WHERE id = 1;
+  RETURN NULL;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS products_bump_catalog_version ON products;
+CREATE TRIGGER products_bump_catalog_version
+  AFTER INSERT OR UPDATE OR DELETE ON products
+  FOR EACH STATEMENT EXECUTE FUNCTION bump_catalog_version();
 
 -- Whether the store currently accepts new orders (used by the orders
 -- INSERT policy). STABLE + pinned search_path; settings are public-read
@@ -608,3 +631,32 @@ BEGIN
 EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;
+
+-- ============================================
+-- MIGRATION 2026-08-23c: live catalog updates.
+-- Any change to products (deactivation, stock, price, new item) bumps
+-- store_settings.catalog_version via trigger; open tabs already
+-- subscribed to store_settings Realtime see the bump and silently
+-- refetch the catalog — so nobody can keep shopping stale products
+-- without a reload. Idempotent: safe to re-run.
+-- ============================================
+
+ALTER TABLE store_settings
+  ADD COLUMN IF NOT EXISTS catalog_version BIGINT NOT NULL DEFAULT 0;
+
+CREATE OR REPLACE FUNCTION bump_catalog_version()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  UPDATE store_settings SET catalog_version = catalog_version + 1 WHERE id = 1;
+  RETURN NULL;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS products_bump_catalog_version ON products;
+CREATE TRIGGER products_bump_catalog_version
+  AFTER INSERT OR UPDATE OR DELETE ON products
+  FOR EACH STATEMENT EXECUTE FUNCTION bump_catalog_version();

@@ -25,6 +25,7 @@ export const DEFAULT_SETTINGS = {
   banner_enabled: false,
   banner_text: '',
   theme: 'default',
+  catalog_version: 0,
   updated_at: null,
 }
 
