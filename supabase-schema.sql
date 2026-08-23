@@ -181,19 +181,36 @@ CREATE POLICY "Users can update their own orders"
   ON orders FOR UPDATE
   USING (auth.uid() = user_id);
 
--- Also allow viewing orders by email (for guest order tracking)
-CREATE POLICY "Guests can view orders by email"
+-- Guest orders are visible only to a signed-in user whose verified email
+-- matches (NOT to anonymous visitors — that would expose all guest orders)
+CREATE POLICY "Users can view guest orders matching their email"
   ON orders FOR SELECT
-  USING (user_id IS NULL);
+  USING (
+    user_id IS NULL
+    AND lower(customer_email) = lower(auth.jwt() ->> 'email')
+  );
 
--- ORDER_ITEMS: Viewable if user owns the parent order
+-- Let signed-in users claim guest orders placed with their email
+-- (used by linkGuestOrdersToUser at login)
+CREATE POLICY "Users can claim guest orders matching their email"
+  ON orders FOR UPDATE
+  USING (
+    user_id IS NULL
+    AND lower(customer_email) = lower(auth.jwt() ->> 'email')
+  )
+  WITH CHECK (user_id = auth.uid());
+
+-- ORDER_ITEMS: Viewable if user owns the parent order (incl. their guest orders)
 CREATE POLICY "Users can view their own order items"
   ON order_items FOR SELECT
   USING (
     EXISTS (
       SELECT 1 FROM orders
       WHERE orders.id = order_items.order_id
-      AND (orders.user_id = auth.uid() OR orders.user_id IS NULL)
+      AND (
+        orders.user_id = auth.uid()
+        OR (orders.user_id IS NULL AND lower(orders.customer_email) = lower(auth.jwt() ->> 'email'))
+      )
     )
   );
 
@@ -429,3 +446,47 @@ DROP POLICY IF EXISTS "Admin can read all favorites" ON favorites;
 CREATE POLICY "Admin can read all favorites"
   ON favorites FOR SELECT
   USING ((auth.jwt() ->> 'email') = 'nanikiibunai@gmail.com');
+
+-- ============================================
+-- MIGRATION 2026-08-23: guest order privacy.
+-- The old "Guests can view orders by email" policy exposed EVERY guest
+-- order (email, phone, shipping address) to anyone with the public anon
+-- key. Guest orders are now visible/claimable only by a signed-in user
+-- whose verified JWT email matches. Also fixes login-time guest-order
+-- linking, which previously matched no rows (no UPDATE policy covered
+-- guest orders). Idempotent: safe to re-run.
+-- NOTE: deploy alongside the app update that stops using .select() on
+-- guest checkout inserts (anonymous users can no longer read orders back).
+-- ============================================
+
+DROP POLICY IF EXISTS "Guests can view orders by email" ON orders;
+DROP POLICY IF EXISTS "Users can view guest orders matching their email" ON orders;
+CREATE POLICY "Users can view guest orders matching their email"
+  ON orders FOR SELECT
+  USING (
+    user_id IS NULL
+    AND lower(customer_email) = lower(auth.jwt() ->> 'email')
+  );
+
+DROP POLICY IF EXISTS "Users can claim guest orders matching their email" ON orders;
+CREATE POLICY "Users can claim guest orders matching their email"
+  ON orders FOR UPDATE
+  USING (
+    user_id IS NULL
+    AND lower(customer_email) = lower(auth.jwt() ->> 'email')
+  )
+  WITH CHECK (user_id = auth.uid());
+
+DROP POLICY IF EXISTS "Users can view their own order items" ON order_items;
+CREATE POLICY "Users can view their own order items"
+  ON order_items FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM orders
+      WHERE orders.id = order_items.order_id
+      AND (
+        orders.user_id = auth.uid()
+        OR (orders.user_id IS NULL AND lower(orders.customer_email) = lower(auth.jwt() ->> 'email'))
+      )
+    )
+  );

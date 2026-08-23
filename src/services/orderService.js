@@ -45,8 +45,19 @@ export const orderService = {
       // Generate unique order number
       const orderNumber = generateOrderNumber()
 
+      // Generate the order id client-side: guests have no SELECT access to
+      // orders (RLS), so INSERT ... RETURNING would come back empty — with a
+      // known id we never need to read the row back
+      const orderId = typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+            const r = (Math.random() * 16) | 0
+            return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16)
+          })
+
       // Prepare order data for insertion
       const order = {
+        id: orderId,
         order_number: orderNumber,
         user_id: user?.id || null,
         status: 'pending',
@@ -64,19 +75,18 @@ export const orderService = {
         customer_notes: orderData.customerNotes || null,
       }
 
-      // Insert order into database
-      // Note: We must use .select() to get the created order back
-      // The RLS policy allows this even for guests during INSERT
-      const { data: createdOrder, error: orderError } = await supabase
+      // Insert order into database — no .select(): guests can't read
+      // orders back under RLS, and we already know every field locally
+      const { error: orderError } = await supabase
         .from('orders')
         .insert([order])
-        .select()
-        .single()
 
       if (orderError) {
         console.error('Error creating order:', orderError)
         throw orderError
       }
+
+      const createdOrder = { ...order, created_at: new Date().toISOString() }
 
       // Prepare order items with product instructions
       const orderItems = orderData.items.map((item, index) => {
@@ -104,11 +114,10 @@ export const orderService = {
         }
       })
 
-      // Insert order items
-      const { data: createdOrderItems, error: itemsError } = await supabase
+      // Insert order items — same as above, no .select() needed
+      const { error: itemsError } = await supabase
         .from('order_items')
         .insert(orderItems)
-        .select()
 
       if (itemsError) {
         console.error('Error creating order items:', itemsError)
@@ -116,6 +125,8 @@ export const orderService = {
         await supabase.from('orders').delete().eq('id', createdOrder.id)
         throw itemsError
       }
+
+      const createdOrderItems = orderItems
 
       return {
         order: createdOrder,
