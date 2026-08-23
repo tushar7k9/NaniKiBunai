@@ -202,16 +202,21 @@
 .trust-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.85rem;
+  gap: 9px;
+  font-size: 0.76rem;
   font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   color: var(--text-light);
   padding: 0 24px;
 }
 
 .trust-icon {
-  font-size: 1rem;
+  font-size: 1.05rem;
   line-height: 1;
+  color: var(--terracotta);
+  stroke-width: 1.6; /* slightly finer than Lucide's default 2 — more refined */
+  flex-shrink: 0;
 }
 
 .trust-dot {
@@ -272,7 +277,7 @@
   }
 
   .trust-dot { display: none; }
-  .trust-item { font-size: 0.8rem; padding: 4px 12px; }
+  .trust-item { font-size: 0.7rem; padding: 4px 12px; }
 }
 
 @media (max-width: 480px) {

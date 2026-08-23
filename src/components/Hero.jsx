@@ -1,6 +1,7 @@
 import React from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
+import { LuHand, LuLeaf, LuPackage, LuHeart } from 'react-icons/lu'
 import { SketchStar, SketchSparkle, SketchStitch } from './SketchElements'
 import './Hero.css'
 
@@ -129,22 +130,22 @@ const Hero = () => {
         transition={{ duration: 0.8, delay: 1.3 }}
       >
         <div className="trust-item">
-          <span className="trust-icon">✋</span>
+          <LuHand className="trust-icon" aria-hidden="true" />
           <span>Handmade</span>
         </div>
         <div className="trust-dot" />
         <div className="trust-item">
-          <span className="trust-icon">🌿</span>
+          <LuLeaf className="trust-icon" aria-hidden="true" />
           <span>Natural Wool</span>
         </div>
         <div className="trust-dot" />
         <div className="trust-item">
-          <span className="trust-icon">📦</span>
-          <span>Ships in 3-5 Days</span>
+          <LuPackage className="trust-icon" aria-hidden="true" />
+          <span>Ships in 3&ndash;5 Days</span>
         </div>
         <div className="trust-dot" />
         <div className="trust-item">
-          <span className="trust-icon">💝</span>
+          <LuHeart className="trust-icon" aria-hidden="true" />
           <span>Made with Love</span>
         </div>
       </motion.div>
