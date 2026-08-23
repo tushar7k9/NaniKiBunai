@@ -86,18 +86,19 @@
   position: absolute;
   left: 50%;
   top: 0.135em;
-  width: 0.14em;
-  height: 0.14em;
-  margin-left: -0.07em;
+  width: 0.165em;
+  height: 0.165em;
+  margin-left: -0.0825em;
   border-radius: 50%;
   background: currentColor;
   transition: opacity 0.18s;
 }
 
-/* the italic "ki" leans right — nudge its dot to follow the slant */
+/* Playfair's italic lean puts the native dot at ~103% of the stem's
+   advance width (measured from the font) — not above the stem's centre */
 .header-logo h1 em .brand-i__dot {
-  margin-left: -0.02em;
-  top: 0.125em;
+  left: 103%;
+  top: 0.13em;
 }
 
 /* the traveller is a miniature of the wool mark itself */
