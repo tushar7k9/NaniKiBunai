@@ -101,8 +101,9 @@
   padding: 16px 20px;
 }
 
-.search-body::-webkit-scrollbar { width: 4px; }
-.search-body::-webkit-scrollbar-thumb { background: var(--terracotta-light); border-radius: 2px; }
+/* Content scrolls, but no visible scrollbar strip */
+.search-body { scrollbar-width: none; }
+.search-body::-webkit-scrollbar { display: none; }
 
 /* Section */
 .search-section {

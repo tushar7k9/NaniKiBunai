@@ -1,10 +1,17 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { FiShoppingBag, FiLock, FiMessageSquare, FiX, FiTruck, FiShield, FiArrowRight } from 'react-icons/fi'
+import { FiShoppingBag, FiLock, FiMessageSquare, FiX, FiTruck, FiShield, FiArrowRight, FiAlertTriangle } from 'react-icons/fi'
 import { useCart } from '../hooks/useCart'
 import { useAuth } from '../hooks/useAuth'
+import { useProducts } from '../hooks/useProducts'
 import { orderService } from '../services/orderService'
+import {
+  hydrateCartItems,
+  getCartIssues,
+  getOrderableSubtotal,
+  validateCartAgainstLiveProducts,
+} from '../utils/cartAvailability'
 import './Checkout.css'
 
 /* ─── NoteButton with smart tooltip ─── */
@@ -40,8 +47,14 @@ const NoteButton = ({ text, onClick }) => {
 const Checkout = () => {
   const navigate = useNavigate()
   const location = useLocation()
-  const { cart, getTotalPrice, clearCart } = useCart()
+  const { cart, clearCart } = useCart()
   const { user, isAuthenticated } = useAuth()
+  const { products } = useProducts()
+
+  // Reconcile cart against the live catalog: fresh prices/stock, and flags
+  // for items that became unavailable since they were added
+  const items = useMemo(() => hydrateCartItems(cart, products), [cart, products])
+  const issues = useMemo(() => getCartIssues(items), [items])
 
   useEffect(() => {
     if (!location.state?.fromCart) {
@@ -69,9 +82,10 @@ const Checkout = () => {
   const [orderError, setOrderError] = useState(null)
   const [currentStep, setCurrentStep] = useState(1) // 1: info, 2: review
 
-  const shippingCost = getTotalPrice() >= 500 ? 0 : 49
-  const tax = Math.round(getTotalPrice() * 0.05)
-  const total = getTotalPrice() + shippingCost + tax
+  const subtotal = getOrderableSubtotal(items)
+  const shippingCost = subtotal >= 500 ? 0 : 49
+  const tax = Math.round(subtotal * 0.05)
+  const total = subtotal + shippingCost + tax
 
   const handleInstructionChange = (index, value) => {
     setProductInstructions((prev) => ({ ...prev, [index]: value }))
@@ -90,18 +104,24 @@ const Checkout = () => {
   const handleSubmit = async (e) => {
     e.preventDefault()
 
-    const hasStockIssues = cart.some(item =>
-      item.stock_quantity === 0 ||
-      (item.stock_quantity !== undefined && item.quantity > item.stock_quantity)
-    )
-
-    if (hasStockIssues) {
-      setOrderError('Some items have stock issues. Please review your cart.')
+    // Gate 1: issues already known from the hydrated cart
+    if (issues.hasBlockingIssues) {
+      setOrderError(`${issues.summary}. Please review your bag.`)
       return
     }
 
     setIsProcessing(true)
     setOrderError(null)
+
+    // Gate 2: re-validate against the database RIGHT NOW — the catalog in
+    // memory can be stale, and the admin may have deactivated a product or
+    // run out of stock while this page was open
+    const liveCheck = await validateCartAgainstLiveProducts(items)
+    if (!liveCheck.ok) {
+      setOrderError(liveCheck.message)
+      setIsProcessing(false)
+      return
+    }
 
     try {
       const shippingAddress = {
@@ -119,8 +139,8 @@ const Checkout = () => {
         billingAddress: shippingAddress,
         customerEmail: shippingInfo.email,
         customerPhone: shippingInfo.phone,
-        items: cart,
-        subtotal: getTotalPrice(),
+        items, // hydrated: current catalog prices, not add-time snapshots
+        subtotal,
         shippingCost,
         taxAmount: tax,
         discountAmount: 0,
@@ -350,7 +370,7 @@ const Checkout = () => {
                   <motion.button
                     className="co-place-order-btn"
                     onClick={handleSubmit}
-                    disabled={isProcessing}
+                    disabled={isProcessing || issues.hasBlockingIssues}
                     whileTap={{ scale: 0.98 }}
                   >
                     {isProcessing ? 'Processing...' : `Place Order — ₹${total.toFixed(0)}`}
@@ -365,11 +385,37 @@ const Checkout = () => {
         <div className="co-summary">
           <h3 className="co-summary__title">Summary</h3>
 
+          {issues.hasBlockingIssues && (
+            <div className="co-error co-error--availability">
+              <FiAlertTriangle /> {issues.summary}. Please update your bag before placing the order.
+            </div>
+          )}
+
           <div className="co-summary__items">
-            {cart.map((item, index) => (
-              <div key={`${item.id}-${index}`} className="co-summary__item">
+            {items.map((item, index) => {
+              const sizeIssue = !!item.variantIssue && item.variantIssue.includes('size')
+              const colorIssue = !!item.variantIssue && item.variantIssue.includes('color')
+              const outOfStock = !item.unavailable && item.stock_quantity === 0
+              const exceedsStock = !item.unavailable && !outOfStock &&
+                item.stock_quantity !== undefined && item.quantity > item.stock_quantity
+              const itemWarning = item.unavailable
+                ? 'No longer available — remove it from your bag'
+                : item.variantIssue
+                  ? `Selected ${item.variantIssue} no longer offered`
+                  : outOfStock
+                    ? 'Out of stock'
+                    : exceedsStock
+                      ? `Only ${item.stock_quantity} available`
+                      : null
+
+              return (
+              <div key={`${item.id}-${index}`} className={`co-summary__item${item.unavailable ? ' co-summary__item--unavailable' : ''}`}>
                 <div className="co-summary__item-img-wrap">
-                  <img src={item.images?.[0] || item.image} alt={item.name} />
+                  {(item.images?.[0] || item.image) ? (
+                    <img src={item.images?.[0] || item.image} alt={item.name} />
+                  ) : (
+                    <div className="co-summary__item-img-placeholder"><FiShoppingBag /></div>
+                  )}
                   <span className="co-summary__item-qty">{item.quantity}</span>
                 </div>
                 <div className="co-summary__item-info">
@@ -377,14 +423,21 @@ const Checkout = () => {
                   <div className="co-summary__item-meta">
                     {(item.selectedColor || item.selected_color) && (
                       <span
-                        className="co-summary__item-dot"
+                        className={`co-summary__item-dot${colorIssue ? ' co-summary__item-dot--bad' : ''}`}
                         style={{ backgroundColor: item.selectedColor || item.selected_color }}
                       />
                     )}
                     {(item.selectedSize || item.selected_size) && (
-                      <span className="co-summary__item-tag">{item.selectedSize || item.selected_size}</span>
+                      <span className={`co-summary__item-tag${sizeIssue ? ' co-summary__item-tag--bad' : ''}`}>
+                        {item.selectedSize || item.selected_size}
+                      </span>
                     )}
                   </div>
+                  {itemWarning && (
+                    <span className="co-summary__item-warning">
+                      <FiAlertTriangle /> {itemWarning}
+                    </span>
+                  )}
                   {/* Per-product note */}
                   {productInstructions[index] ? (
                     <NoteButton
@@ -401,16 +454,19 @@ const Checkout = () => {
                     </button>
                   )}
                 </div>
-                <span className="co-summary__item-price">&#8377;{(item.price * item.quantity).toFixed(0)}</span>
+                <span className="co-summary__item-price">
+                  {item.unavailable ? 'N/A' : `₹${((Number(item.price) || 0) * item.quantity).toFixed(0)}`}
+                </span>
               </div>
-            ))}
+              )
+            })}
           </div>
 
           <div className="co-summary__stitch" />
 
           <div className="co-summary__row">
             <span>Subtotal</span>
-            <span>&#8377;{getTotalPrice().toFixed(0)}</span>
+            <span>&#8377;{subtotal.toFixed(0)}</span>
           </div>
           <div className="co-summary__row">
             <span>Shipping</span>

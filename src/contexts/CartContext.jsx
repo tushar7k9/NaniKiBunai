@@ -82,10 +82,16 @@ export const CartProvider = ({ children }) => {
 
         if (error) throw error
 
-        // Transform data to match cart format
+        // Transform data to match cart format.
+        // item.products is NULL when the admin deactivated the product (RLS
+        // only exposes active products) — guard the spread and fall back to
+        // the price snapshot so totals never turn NaN; the availability
+        // layer (hydrateCartItems) marks such items unavailable in the UI.
         const cartItems = (data || []).map(item => ({
           id: item.product_id,
-          ...item.products,
+          ...(item.products || {}),
+          price: item.products?.price ?? item.price_snapshot ?? 0,
+          price_snapshot: item.price_snapshot,
           quantity: item.quantity,
           selected_color: item.selected_color,
           selected_size: item.selected_size,
@@ -492,7 +498,7 @@ export const CartProvider = ({ children }) => {
    * Get total price of cart
    */
   const getTotalPrice = () => {
-    return cart.reduce((total, item) => total + (item.price * item.quantity), 0)
+    return cart.reduce((total, item) => total + (Number(item.price) || 0) * (item.quantity || 0), 0)
   }
 
   /**

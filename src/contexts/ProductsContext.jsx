@@ -202,9 +202,12 @@ export const ProductsProvider = ({ children }) => {
 
   /**
    * Load products from Supabase or static data
+   * @param {boolean} silent - refresh without toggling the global loading
+   *   state (used by the cart to re-check availability without flashing
+   *   skeletons across the storefront)
    */
-  const loadProducts = async () => {
-    setLoading(true)
+  const loadProducts = async (silent = false) => {
+    if (!silent) setLoading(true)
     setError(null)
 
     try {

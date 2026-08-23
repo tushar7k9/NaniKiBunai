@@ -46,12 +46,25 @@
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Hide the document scrollbar everywhere — scrolling still works via
+   wheel / trackpad / keys / touch. Applied on html AND body since either
+   can own the page scroller depending on the browser. */
+html {
+  scrollbar-width: none; /* Firefox */
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none; /* Chrome / Safari / Edge */
+}
+
 body {
   font-family: var(--font-body);
   color: var(--text-dark);
   background-color: var(--warm-white);
   line-height: 1.75;
   overflow-x: hidden;
+  scrollbar-width: none; /* Firefox */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
