@@ -249,6 +249,15 @@ img {
   text-transform: uppercase;
 }
 
+/* Inside section headers the badge sits on its own line above the heading —
+   inline badge + inline-block h2 would otherwise share a line when they fit */
+.section-header .handcrafted-badge {
+  display: flex;
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 /* ── Section divider ── */
 .sketch-wave-divider {
   width: 100%;
