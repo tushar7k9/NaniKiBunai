@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { FiShoppingCart, FiMenu, FiX, FiSearch, FiHeart, FiUser, FiLogOut, FiPackage, FiGrid } from 'react-icons/fi'
+import { GiWool } from 'react-icons/gi'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import MobileMenu from './MobileMenu'
@@ -67,7 +68,7 @@ const Header = ({ cartCount, favoritesCount, onCartClick, onFavoritesClick, cart
               className="logo-yarn"
               whileHover={{ rotate: 20 }}
               transition={{ duration: 0.3 }}
-            >🧶</motion.span>
+            ><GiWool aria-hidden="true" /></motion.span>
             {' '}Nani <em>ki</em> Bunai
           </motion.h1>
         </div>

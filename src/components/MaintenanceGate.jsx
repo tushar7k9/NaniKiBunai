@@ -2,6 +2,7 @@ import React from 'react'
 import { useLocation, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { FiTool, FiMail, FiPauseCircle } from 'react-icons/fi'
+import { GiWool } from 'react-icons/gi'
 import { useAuth } from '../hooks/useAuth'
 import { useStoreSettings } from '../hooks/useStoreSettings'
 import './MaintenanceGate.css'
@@ -75,7 +76,7 @@ const MaintenanceGate = ({ children }) => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
       >
-        <span className="maintenance-curtain__logo">🧶</span>
+        <span className="maintenance-curtain__logo"><GiWool aria-hidden="true" /></span>
         <h1 className="maintenance-curtain__title">
           Nani <em>ki</em> Bunai
         </h1>

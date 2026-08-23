@@ -36,8 +36,11 @@
 }
 
 .mm-brand__logo {
+  display: inline-flex;
+  align-items: center;
   font-size: 1.9rem;
   line-height: 1;
+  color: var(--terracotta);
 }
 
 .mm-brand__text {

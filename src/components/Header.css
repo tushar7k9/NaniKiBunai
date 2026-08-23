@@ -47,8 +47,11 @@
 }
 
 .logo-yarn {
-  display: inline-block;
-  font-size: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  font-size: 1.9rem;
+  color: var(--terracotta);
+  vertical-align: -0.22em;
 }
 
 .header-nav {

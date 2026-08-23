@@ -2,6 +2,7 @@ import React from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { LuHand, LuLeaf, LuPackage, LuHeart } from 'react-icons/lu'
+import { GiWool } from 'react-icons/gi'
 import { SketchStar, SketchSparkle, SketchStitch } from './SketchElements'
 import './Hero.css'
 
@@ -109,7 +110,7 @@ const Hero = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 1.2 }}
           >
-            <span className="floating-card-icon">🧶</span>
+            <span className="floating-card-icon"><GiWool aria-hidden="true" /></span>
             <div>
               <p className="floating-card-title">100% Handmade</p>
               <p className="floating-card-sub">Premium Natural Wool</p>

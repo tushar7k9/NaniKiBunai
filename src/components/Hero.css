@@ -156,8 +156,10 @@
 }
 
 .floating-card-icon {
+  display: inline-flex;
   font-size: 1.8rem;
   line-height: 1;
+  color: var(--terracotta);
 }
 
 .floating-card-title {
