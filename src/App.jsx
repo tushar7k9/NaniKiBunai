@@ -19,7 +19,7 @@ import { FlyToCartProvider, useFlyToCart } from './components/FlyToCart'
 import Header from './components/Header'
 import Cart from './components/Cart'
 import SearchOverlay from './components/SearchOverlay'
-import MaintenanceGate from './components/MaintenanceGate'
+import MaintenanceGate, { OrdersPausedRibbon } from './components/MaintenanceGate'
 import AnnouncementBanner from './components/AnnouncementBanner'
 import Hero from './components/Hero'
 import Categories from './components/Categories'
@@ -41,6 +41,7 @@ import Register from './pages/Register'
 import Profile from './pages/Profile'
 import Checkout from './pages/Checkout'
 import Orders from './pages/Orders'
+import { TermsPage, PrivacyPage, ShippingReturnsPage, HelpPage } from './pages/InfoPages'
 
 // Admin — all lazy-loaded: shoppers never download the admin area
 // (pages, admin CSS, recharts). Loaded on demand when the admin logs in.
@@ -145,6 +146,7 @@ function AppContent() {
         <Route path="*" element={
           <div className="App">
             <AnnouncementBanner />
+            <OrdersPausedRibbon />
             <Header
               cartCount={getTotalItems()}
               favoritesCount={getFavoritesCount()}
@@ -177,6 +179,10 @@ function AppContent() {
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/checkout" element={<Checkout />} />
                 <Route path="/orders" element={<Orders />} />
+                <Route path="/terms" element={<TermsPage />} />
+                <Route path="/privacy" element={<PrivacyPage />} />
+                <Route path="/shipping-returns" element={<ShippingReturnsPage />} />
+                <Route path="/help" element={<HelpPage />} />
               </Routes>
             </MaintenanceGate>
             <Footer />

@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { FiX, FiPlus, FiMinus, FiTrash2, FiShoppingBag, FiArrowRight, FiAlertTriangle } from 'react-icons/fi'
+import { FiX, FiPlus, FiMinus, FiTrash2, FiShoppingBag, FiArrowRight, FiAlertTriangle, FiPauseCircle } from 'react-icons/fi'
 import { useProducts } from '../hooks/useProducts'
 import { useStoreSettings } from '../hooks/useStoreSettings'
 import { hydrateCartItems, getCartIssues, getOrderableSubtotal } from '../utils/cartAvailability'
@@ -285,8 +285,9 @@ const Cart = ({ isOpen, onClose, cartItems, updateQuantity, removeFromCart }) =>
             {items.length > 0 && (
               <div className="cart-footer">
                 {ordersBlocked && (
-                  <div className="cart-footer__warning">
-                    <FiAlertTriangle /> {pauseMessage}
+                  <div className="cart-footer__notice">
+                    <FiPauseCircle />
+                    <span>{pauseMessage}</span>
                   </div>
                 )}
                 {!ordersBlocked && issues.hasBlockingIssues && (

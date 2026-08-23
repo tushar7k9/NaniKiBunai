@@ -222,7 +222,7 @@ const MobileMenu = ({ isOpen, onClose, favoritesCount = 0 }) => {
 
             {/* Footer */}
             <div className="mm-footer">
-              <span><FiMapPin /> Jaipur, Rajasthan</span>
+              <span><FiMapPin /> Gurugram, Haryana</span>
               <span><FiMail /> info@nanikibunai.com</span>
               <span><FiPhone /> +91 98765 43210</span>
             </div>

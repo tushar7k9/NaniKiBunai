@@ -407,7 +407,7 @@ const Checkout = () => {
           <h3 className="co-summary__title">Summary</h3>
 
           {ordersBlocked && (
-            <div className="co-error co-error--availability">
+            <div className="co-notice">
               <FiAlertTriangle /> {pauseMessage}
             </div>
           )}
