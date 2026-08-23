@@ -218,23 +218,49 @@ const compressPhoto = (file) =>
     img.src = url
   })
 
+const RETURN_REASON_LABEL = Object.fromEntries(RETURN_REASONS.map((r) => [r.id, r.label]))
+
 /* Mini progress rail for a return request on the order card */
 const ReturnTracker = ({ request }) => {
+  const itemNames = (request.items || []).map((i) => i.name).join(', ')
+
   if (request.status === 'rejected') {
     return (
       <div className="ord-return-card ord-return-card--rejected">
         <div className="ord-return-card__head">
           <FiXCircle />
-          <span>Return request declined</span>
+          <span>
+            {request.type === 'refund' ? 'Return' : 'Replacement'} declined · {itemNames}
+          </span>
         </div>
-        {request.rejection_reason && (
-          <p className="ord-return-card__reason">"{request.rejection_reason}"</p>
+        <p className="ord-return-card__meta">
+          Your request: {RETURN_REASON_LABEL[request.reason] || request.reason}
+          {request.description && <> — "{request.description}"</>}
+        </p>
+        {(request.photos || []).length > 0 && (
+          <div className="ord-return-card__photos">
+            {request.photos.map((p, i) => (
+              <img
+                key={i}
+                src={p}
+                alt={`Photo ${i + 1} you sent`}
+                onClick={(e) => e.currentTarget.classList.toggle('zoomed')}
+              />
+            ))}
+          </div>
         )}
+        <div className="ord-return-card__verdict">
+          <strong>Why it was declined:</strong>{' '}
+          {request.rejection_reason || 'Please contact us for details.'}
+        </div>
+        <p className="ord-return-card__final">
+          Each item has a single return chance, so this item can't be requested
+          again. Questions? Write to info@nanikibunai.com.
+        </p>
       </div>
     )
   }
   const currentIndex = RETURN_STEPS.indexOf(request.status)
-  const itemNames = (request.items || []).map((i) => i.name).join(', ')
   return (
     <div className="ord-return-card">
       <div className="ord-return-card__head">
@@ -352,7 +378,8 @@ const ReturnDialog = ({ order, eligibility, onClose, onSubmitted }) => {
         <h3 className="ord-confirm__title">Return or replace</h3>
         <p className="ord-return-dialog__window">
           {eligibility.daysLeft} day{eligibility.daysLeft !== 1 ? 's' : ''} left in your return window ·
-          items must be unused and in their original condition
+          items must be unused and in their original condition · each item can
+          be requested once
         </p>
 
         {/* 1. Items */}
@@ -938,7 +965,7 @@ const Orders = () => {
                         const elig = orderService.getReturnEligibility(order)
                         if (!elig.eligible) return null
                         return (
-                          <div className="ord-details__section ord-details__section--actions">
+                          <div className="ord-details__section ord-details__section--return">
                             <button
                               className="ord-return-btn"
                               onClick={(e) => {

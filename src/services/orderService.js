@@ -387,7 +387,7 @@ export const orderService = {
         RETURN_NOT_PAID: 'Returns can be requested once payment is completed.',
         RETURN_WINDOW_EXPIRED: 'The 7-day return window for this order has ended.',
         RETURN_ITEM_CUSTOM: 'Custom-made items cannot be returned.',
-        RETURN_ITEM_ALREADY_REQUESTED: 'A return has already been requested for one of these items.',
+        RETURN_ITEM_ALREADY_REQUESTED: 'A return was already requested for one of these items — each item has a single return chance.',
         RETURN_PHOTOS_REQUIRED: 'Please add at least one photo of the item.',
         RETURN_NO_ITEMS: 'Please select at least one item to return.',
       }
@@ -411,9 +411,10 @@ export const orderService = {
     const msLeft = new Date(order.delivered_at).getTime() + 7 * 86400000 - Date.now()
     if (msLeft <= 0) return none('window_expired')
 
-    const activeRequests = (order.return_requests || []).filter((r) => r.status !== 'rejected')
+    // One chance per item: ANY prior request — even a rejected one —
+    // consumes that item's single return opportunity
     const requestedItemIds = new Set(
-      activeRequests.flatMap((r) => (r.items || []).map((i) => i.order_item_id))
+      (order.return_requests || []).flatMap((r) => (r.items || []).map((i) => i.order_item_id))
     )
     const eligibleItems = (order.items || []).filter(
       (item) =>
