@@ -847,3 +847,123 @@
     background: #FCF7F2;
   }
 }
+
+/* ── Returns & replacements (admin) ── */
+
+.adm-orders__return-tag,
+.adm-orders__replacement-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 100px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+
+.adm-orders__return-tag {
+  background: rgba(138, 75, 8, 0.1);
+  color: #8A4B08;
+}
+
+.adm-orders__replacement-tag {
+  background: rgba(90, 62, 133, 0.1);
+  color: #5A3E85;
+}
+
+.adm-badge--replacement { background: rgba(90, 62, 133, 0.12); color: #5A3E85; }
+.adm-badge--return-requested { background: #FCEBCF; color: #8A6D1A; }
+.adm-badge--return-approved { background: #DCE9F7; color: #2C5F8A; }
+.adm-badge--return-received { background: #E4DCF7; color: #5A3E85; }
+.adm-badge--return-completed { background: #D4EDDA; color: #155724; }
+.adm-badge--return-rejected { background: #F8D7DA; color: #721C24; }
+
+.adm-orders__return {
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle, #E5DDD4);
+  border-radius: 10px;
+  background: #FDFBF8;
+  margin-bottom: 10px;
+}
+
+.adm-orders__return--rejected { opacity: 0.75; }
+
+.adm-orders__return-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--deep-brown);
+}
+
+.adm-orders__return-head svg { color: var(--terracotta); flex-shrink: 0; }
+.adm-orders__return-head .adm-badge { margin-left: auto; }
+
+.adm-orders__return-reason {
+  margin: 6px 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.adm-orders__return-desc {
+  margin: 6px 0 0;
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--text-light);
+  overflow-wrap: break-word;
+}
+
+.adm-orders__return-items {
+  margin: 8px 0 0;
+  padding: 0 0 0 16px;
+  font-size: 0.78rem;
+  color: var(--deep-brown);
+}
+
+.adm-orders__return-swap {
+  color: var(--terracotta-dark, #A96B49);
+  font-weight: 600;
+}
+
+.adm-orders__return-photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.adm-orders__return-photos img {
+  width: 52px;
+  height: 52px;
+  object-fit: cover;
+  border-radius: 8px;
+  cursor: zoom-in;
+  transition: width 0.2s, height 0.2s;
+}
+
+.adm-orders__return-photos img.zoomed {
+  width: 100%;
+  height: auto;
+  cursor: zoom-out;
+}
+
+.adm-orders__return-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.adm-orders__return-reject { margin-top: 10px; }
+.adm-orders__return-reject textarea { width: 100%; font-size: 0.82rem; }
+
+.adm-orders__return-msg {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #2d8659;
+}

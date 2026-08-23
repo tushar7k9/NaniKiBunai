@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   FiPackage, FiTruck, FiCheckCircle, FiXCircle, FiClock,
   FiChevronDown, FiExternalLink, FiAlertCircle, FiRotateCcw,
+  FiCamera, FiX, FiRepeat,
 } from 'react-icons/fi'
 import { useAuth } from '../hooks/useAuth'
 import { orderService } from '../services/orderService'
@@ -73,6 +74,9 @@ const paymentStatusConfig = {
 // A cancelled/returned order that was never paid owes nothing — showing
 // "Pay on delivery" there would be misleading
 const getPayStatus = (order) => {
+  if (order.replacement_for) {
+    return { label: 'Replacement · No charge', color: '#5A3E85', bg: 'rgba(90, 62, 133, 0.09)' }
+  }
   if (order.payment_status === 'pending' && ['cancelled', 'returned'].includes(order.status)) {
     return paymentStatusConfig.not_charged
   }
@@ -170,6 +174,331 @@ const OrderProgressStepper = ({ order, events }) => {
   )
 }
 
+// ── Return / replacement flow ──
+
+const RETURN_REASONS = [
+  { id: 'size', label: 'Size issue' },
+  { id: 'color', label: 'Color issue' },
+  { id: 'damaged', label: 'Damaged / defective' },
+  { id: 'not_as_described', label: 'Not as described' },
+  { id: 'other', label: 'Other' },
+]
+
+const RETURN_STEPS = ['requested', 'approved', 'received', 'completed']
+
+const returnStepLabel = (step, type) => ({
+  requested: 'Requested',
+  approved: 'Approved',
+  received: 'Received',
+  completed: type === 'refund' ? 'Refunded' : 'Replacement sent',
+}[step])
+
+const STANDARD_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
+
+/* Downscale a photo to a small base64 JPEG (stored in the DB like reviews) */
+const compressPhoto = (file) =>
+  new Promise((resolve, reject) => {
+    if (file.size > 8 * 1024 * 1024) {
+      reject(new Error('Each photo must be under 8MB'))
+      return
+    }
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      const MAX = 1000
+      const scale = Math.min(1, MAX / Math.max(img.width, img.height))
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.round(img.width * scale)
+      canvas.height = Math.round(img.height * scale)
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+      URL.revokeObjectURL(url)
+      resolve(canvas.toDataURL('image/jpeg', 0.72))
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read the photo')) }
+    img.src = url
+  })
+
+/* Mini progress rail for a return request on the order card */
+const ReturnTracker = ({ request }) => {
+  if (request.status === 'rejected') {
+    return (
+      <div className="ord-return-card ord-return-card--rejected">
+        <div className="ord-return-card__head">
+          <FiXCircle />
+          <span>Return request declined</span>
+        </div>
+        {request.rejection_reason && (
+          <p className="ord-return-card__reason">"{request.rejection_reason}"</p>
+        )}
+      </div>
+    )
+  }
+  const currentIndex = RETURN_STEPS.indexOf(request.status)
+  const itemNames = (request.items || []).map((i) => i.name).join(', ')
+  return (
+    <div className="ord-return-card">
+      <div className="ord-return-card__head">
+        {request.type === 'refund' ? <FiRotateCcw /> : <FiRepeat />}
+        <span>
+          {request.type === 'refund' ? 'Return' : 'Replacement'} · {itemNames}
+        </span>
+        {request.type === 'refund' && request.refund_amount > 0 && (
+          <span className="ord-return-card__amount">₹{Number(request.refund_amount).toFixed(0)}</span>
+        )}
+      </div>
+      <div className="ord-return-steps">
+        {RETURN_STEPS.map((step, i) => (
+          <React.Fragment key={step}>
+            {i > 0 && <div className={`ord-return-steps__line${i <= currentIndex ? ' done' : ''}`} />}
+            <div className={`ord-return-steps__step${i <= currentIndex ? ' done' : ''}${i === currentIndex ? ' current' : ''}`}>
+              <span className="ord-return-steps__dot" />
+              <span className="ord-return-steps__label">{returnStepLabel(step, request.type)}</span>
+            </div>
+          </React.Fragment>
+        ))}
+      </div>
+      {request.status === 'approved' && (
+        <p className="ord-return-card__hint">We're arranging a pickup — keep the item in its original condition.</p>
+      )}
+      {request.status === 'received' && (
+        <p className="ord-return-card__hint">
+          {request.type === 'refund'
+            ? 'Item received — your refund is being processed (7–10 business days).'
+            : 'Item received — your replacement is being prepared.'}
+        </p>
+      )}
+    </div>
+  )
+}
+
+/* Dialog to request a return or replacement for selected items */
+const ReturnDialog = ({ order, eligibility, onClose, onSubmitted }) => {
+  const [selected, setSelected] = useState(() => new Set(
+    eligibility.eligibleItems.length === 1 ? [eligibility.eligibleItems[0].id] : []
+  ))
+  const [type, setType] = useState('refund')
+  const [reason, setReason] = useState(null)
+  const [description, setDescription] = useState('')
+  const [photos, setPhotos] = useState([])
+  const [prefs, setPrefs] = useState({}) // itemId -> { size, color }
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState(null)
+
+  const toggleItem = (id) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const handlePhotos = async (e) => {
+    const files = Array.from(e.target.files || [])
+    e.target.value = ''
+    if (files.length + photos.length > 4) {
+      setError('You can add up to 4 photos')
+      return
+    }
+    try {
+      const compressed = await Promise.all(files.map(compressPhoto))
+      setPhotos((prev) => [...prev, ...compressed])
+      setError(null)
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  const handleSubmit = async () => {
+    if (selected.size === 0) { setError('Select at least one item'); return }
+    if (!reason) { setError('Pick a reason for the return'); return }
+    if (photos.length === 0) { setError('Please add at least one photo showing the item\'s condition'); return }
+    setSubmitting(true)
+    setError(null)
+    try {
+      const items = [...selected].map((id) => ({
+        order_item_id: id,
+        replacement_size: type === 'replacement' ? prefs[id]?.size || null : null,
+        replacement_color: type === 'replacement' ? prefs[id]?.color || null : null,
+      }))
+      const request = await orderService.requestReturn(order.id, {
+        type, reason, description: description.trim() || null, photos, items,
+      })
+      onSubmitted(request)
+    } catch (err) {
+      setError(err.message)
+      setSubmitting(false)
+    }
+  }
+
+  const selectedItems = eligibility.eligibleItems.filter((i) => selected.has(i.id))
+
+  return (
+    <motion.div
+      className="ord-confirm-overlay"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.div
+        className="ord-confirm ord-return-dialog"
+        initial={{ opacity: 0, y: 30, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 20, scale: 0.97 }}
+        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="ord-confirm__title">Return or replace</h3>
+        <p className="ord-return-dialog__window">
+          {eligibility.daysLeft} day{eligibility.daysLeft !== 1 ? 's' : ''} left in your return window ·
+          items must be unused and in their original condition
+        </p>
+
+        {/* 1. Items */}
+        <div className="ord-return-dialog__group">
+          <span className="ord-return-dialog__label">Which item{eligibility.eligibleItems.length > 1 ? 's' : ''}?</span>
+          {eligibility.eligibleItems.map((item) => (
+            <label key={item.id} className={`ord-return-item${selected.has(item.id) ? ' picked' : ''}`}>
+              <input
+                type="checkbox"
+                checked={selected.has(item.id)}
+                onChange={() => toggleItem(item.id)}
+              />
+              <img src={item.product_snapshot?.images?.[0] || '/placeholder.png'} alt="" />
+              <span className="ord-return-item__name">
+                {item.product_snapshot?.name}
+                <small>Qty {item.quantity}{item.selected_size ? ` · ${item.selected_size}` : ''}</small>
+              </span>
+              <span className="ord-return-item__price">₹{Number(item.total_price).toFixed(0)}</span>
+            </label>
+          ))}
+        </div>
+
+        {/* 2. Resolution */}
+        <div className="ord-return-dialog__group">
+          <span className="ord-return-dialog__label">What would you like?</span>
+          <div className="ord-return-dialog__types">
+            <button
+              className={`ord-return-type${type === 'refund' ? ' active' : ''}`}
+              onClick={() => setType('refund')}
+            >
+              <FiRotateCcw />
+              <span>Refund</span>
+              <small>Money back once we receive the item</small>
+            </button>
+            <button
+              className={`ord-return-type${type === 'replacement' ? ' active' : ''}`}
+              onClick={() => setType('replacement')}
+            >
+              <FiRepeat />
+              <span>Replacement</span>
+              <small>A new piece in a different size or color</small>
+            </button>
+          </div>
+        </div>
+
+        {/* 2b. Replacement preferences */}
+        {type === 'replacement' && selectedItems.length > 0 && (
+          <div className="ord-return-dialog__group">
+            <span className="ord-return-dialog__label">Pick the replacement</span>
+            {selectedItems.map((item) => {
+              const sizes = item.product_snapshot?.sizes?.length
+                ? item.product_snapshot.sizes.filter((s) => s !== 'Custom')
+                : STANDARD_SIZES
+              const colors = item.product_snapshot?.colors || []
+              return (
+                <div key={item.id} className="ord-return-pref">
+                  <span className="ord-return-pref__name">{item.product_snapshot?.name}</span>
+                  <select
+                    value={prefs[item.id]?.size || item.selected_size || ''}
+                    onChange={(e) => setPrefs((p) => ({ ...p, [item.id]: { ...p[item.id], size: e.target.value } }))}
+                  >
+                    {sizes.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  {colors.length > 0 && (
+                    <select
+                      value={prefs[item.id]?.color || item.selected_color || ''}
+                      onChange={(e) => setPrefs((p) => ({ ...p, [item.id]: { ...p[item.id], color: e.target.value } }))}
+                    >
+                      {colors.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* 3. Reason */}
+        <div className="ord-return-dialog__group">
+          <span className="ord-return-dialog__label">Why?</span>
+          <div className="ord-return-dialog__reasons">
+            {RETURN_REASONS.map((r) => (
+              <button
+                key={r.id}
+                className={`ord-return-reason${reason === r.id ? ' active' : ''}`}
+                onClick={() => setReason(r.id)}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+          <textarea
+            className="ord-confirm__reason"
+            rows={2}
+            maxLength={1000}
+            placeholder="Tell us a little more (optional)"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </div>
+
+        {/* 4. Photos */}
+        <div className="ord-return-dialog__group">
+          <span className="ord-return-dialog__label">Photos of the item (required)</span>
+          <div className="ord-return-photos">
+            {photos.map((p, i) => (
+              <div key={i} className="ord-return-photo">
+                <img src={p} alt={`Return photo ${i + 1}`} />
+                <button onClick={() => setPhotos(photos.filter((_, x) => x !== i))} aria-label="Remove photo">
+                  <FiX />
+                </button>
+              </div>
+            ))}
+            {photos.length < 4 && (
+              <label className="ord-return-photo-add">
+                <FiCamera />
+                <span>Add</span>
+                <input type="file" accept="image/*" multiple onChange={handlePhotos} hidden />
+              </label>
+            )}
+          </div>
+        </div>
+
+        {error && <p className="ord-confirm__error">{error}</p>}
+
+        <div className="ord-confirm__actions">
+          <button
+            className="ord-confirm__btn ord-confirm__btn--cancel"
+            onClick={handleSubmit}
+            disabled={submitting}
+          >
+            {submitting ? 'Submitting…' : type === 'refund' ? 'Request Return' : 'Request Replacement'}
+          </button>
+          <button
+            className="ord-confirm__btn ord-confirm__btn--keep"
+            onClick={onClose}
+            disabled={submitting}
+          >
+            Not Now
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
 // ── Main Component ──
 const Orders = () => {
   const navigate = useNavigate()
@@ -185,6 +514,18 @@ const Orders = () => {
   const [cancelReason, setCancelReason] = useState('')
   const [cancelledJustNow, setCancelledJustNow] = useState(null) // orderId
   const [orderEvents, setOrderEvents] = useState({}) // orderId -> events[]
+  const [returnDialogOrder, setReturnDialogOrder] = useState(null)
+  const [returnJustNow, setReturnJustNow] = useState(null) // orderId
+
+  const handleReturnSubmitted = (request) => {
+    setOrders((prev) => prev.map((o) =>
+      o.id === request.order_id
+        ? { ...o, return_requests: [...(o.return_requests || []), request] }
+        : o
+    ))
+    setReturnJustNow(request.order_id)
+    setReturnDialogOrder(null)
+  }
 
   useEffect(() => {
     if (authLoading) return
@@ -405,6 +746,25 @@ const Orders = () => {
                         </div>
                       )}
 
+                      {/* Return request confirmation (just happened) */}
+                      {returnJustNow === order.id && (
+                        <div className="ord-cancel-success">
+                          <FiCheckCircle /> Your request has been submitted — we'll review it and get back to you shortly.
+                        </div>
+                      )}
+
+                      {/* Replacement order linkage */}
+                      {order.replacement_for && (
+                        <div className="ord-replacement-note">
+                          <FiRepeat />
+                          <span>
+                            This is a free replacement for order{' '}
+                            <strong>#{orders.find((o) => o.id === order.replacement_for)?.order_number || 'your earlier order'}</strong>
+                            {' '}— nothing to pay.
+                          </span>
+                        </div>
+                      )}
+
                       {/* 1. Progress Stepper */}
                       <div className="ord-details__section">
                         <OrderProgressStepper order={order} events={orderEvents[order.id]} />
@@ -548,7 +908,17 @@ const Orders = () => {
                         </div>
                       )}
 
-                      {/* 8. Cancel Order */}
+                      {/* 8. Return / replacement progress */}
+                      {(order.return_requests || []).length > 0 && (
+                        <div className="ord-details__section">
+                          <h4 className="ord-details__label">Returns</h4>
+                          {order.return_requests.map((req) => (
+                            <ReturnTracker key={req.id} request={req} />
+                          ))}
+                        </div>
+                      )}
+
+                      {/* 9. Actions: cancel (early statuses) / return (after delivery) */}
                       {['pending', 'confirmed'].includes(order.status) && (
                         <div className="ord-details__section ord-details__section--actions">
                           <button
@@ -564,6 +934,26 @@ const Orders = () => {
                           </button>
                         </div>
                       )}
+                      {(() => {
+                        const elig = orderService.getReturnEligibility(order)
+                        if (!elig.eligible) return null
+                        return (
+                          <div className="ord-details__section ord-details__section--actions">
+                            <button
+                              className="ord-return-btn"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setReturnDialogOrder(order)
+                              }}
+                            >
+                              <FiRotateCcw /> Return or Replace
+                            </button>
+                            <span className="ord-return-window-hint">
+                              {elig.daysLeft} day{elig.daysLeft !== 1 ? 's' : ''} left in your return window
+                            </span>
+                          </div>
+                        )
+                      })()}
 
                     </div>
                   </div>
@@ -573,6 +963,18 @@ const Orders = () => {
           </div>
         )}
       </div>
+
+      {/* Return / Replacement Dialog */}
+      <AnimatePresence>
+        {returnDialogOrder && (
+          <ReturnDialog
+            order={returnDialogOrder}
+            eligibility={orderService.getReturnEligibility(returnDialogOrder)}
+            onClose={() => setReturnDialogOrder(null)}
+            onSubmitted={handleReturnSubmitted}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Cancel Confirmation Dialog */}
       <AnimatePresence>

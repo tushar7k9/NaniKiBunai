@@ -249,7 +249,8 @@ export const orderService = {
         'id, order_number, user_id, status, subtotal, shipping_cost, tax_amount, ' +
         'discount_amount, total_amount, shipping_address, customer_email, customer_phone, ' +
         'payment_status, payment_method, tracking_number, customer_notes, cancellation_reason, customer_note, ' +
-        'shipped_at, delivered_at, cancelled_at, returned_at, refunded_at, created_at, updated_at'
+        'shipped_at, delivered_at, cancelled_at, returned_at, refunded_at, created_at, updated_at, ' +
+        'replacement_for, return_requests!return_requests_order_id_fkey(*)'
 
       // Build query for orders linked to user
       let query = supabase
@@ -360,6 +361,70 @@ export const orderService = {
    * @param {string} orderId - Order UUID
    * @returns {Promise<Array>} Events, oldest first
    */
+  /**
+   * Request a return (refund or replacement) for specific items of a
+   * delivered, paid order. All rules are enforced by the DB function;
+   * this maps its error codes to friendly messages.
+   * @param {string} orderId
+   * @param {Object} payload - { type, reason, description, photos, items }
+   * @returns {Promise<Object>} the created return request row
+   */
+  requestReturn: async (orderId, { type, reason, description, photos, items }) => {
+    const { data, error } = await supabase.rpc('request_return', {
+      p_order_id: orderId,
+      p_type: type,
+      p_reason: reason,
+      p_description: description || null,
+      p_photos: photos,
+      p_items: items,
+    })
+
+    if (error) {
+      const friendly = {
+        RETURN_ORDER_NOT_FOUND: 'We could not find this order on your account.',
+        RETURN_NOT_ELIGIBLE_REPLACEMENT: 'Replacement orders cannot be returned. Please contact us if something is wrong.',
+        RETURN_NOT_DELIVERED: 'Returns can be requested once the order is delivered.',
+        RETURN_NOT_PAID: 'Returns can be requested once payment is completed.',
+        RETURN_WINDOW_EXPIRED: 'The 7-day return window for this order has ended.',
+        RETURN_ITEM_CUSTOM: 'Custom-made items cannot be returned.',
+        RETURN_ITEM_ALREADY_REQUESTED: 'A return has already been requested for one of these items.',
+        RETURN_PHOTOS_REQUIRED: 'Please add at least one photo of the item.',
+        RETURN_NO_ITEMS: 'Please select at least one item to return.',
+      }
+      const code = Object.keys(friendly).find((k) => error.message?.includes(k))
+      throw new Error(code ? friendly[code] : 'Could not submit the return request. Please try again.')
+    }
+    return Array.isArray(data) ? data[0] : data
+  },
+
+  /**
+   * Client-side mirror of the return eligibility rules (the DB enforces
+   * them authoritatively) — used to decide whether to show the button.
+   * @returns {{ eligible: boolean, daysLeft: number, eligibleItems: Array, reason?: string }}
+   */
+  getReturnEligibility: (order) => {
+    const none = (reason) => ({ eligible: false, daysLeft: 0, eligibleItems: [], reason })
+    if (order.replacement_for) return none('replacement')
+    if (!['delivered', 'completed'].includes(order.status)) return none('not_delivered')
+    if (order.payment_status !== 'paid') return none('not_paid')
+    if (!order.delivered_at) return none('not_delivered')
+    const msLeft = new Date(order.delivered_at).getTime() + 7 * 86400000 - Date.now()
+    if (msLeft <= 0) return none('window_expired')
+
+    const activeRequests = (order.return_requests || []).filter((r) => r.status !== 'rejected')
+    const requestedItemIds = new Set(
+      activeRequests.flatMap((r) => (r.items || []).map((i) => i.order_item_id))
+    )
+    const eligibleItems = (order.items || []).filter(
+      (item) =>
+        item.selected_size !== 'Custom' &&
+        !item.product_snapshot?.customer_instructions &&
+        !requestedItemIds.has(item.id)
+    )
+    if (eligibleItems.length === 0) return none('no_eligible_items')
+    return { eligible: true, daysLeft: Math.ceil(msLeft / 86400000), eligibleItems }
+  },
+
   getOrderEvents: async (orderId) => {
     try {
       const { data, error } = await supabase

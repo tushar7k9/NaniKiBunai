@@ -10,6 +10,8 @@ import {
   FiCheck,
   FiClock,
   FiCornerUpLeft,
+  FiRotateCcw,
+  FiRepeat,
 } from 'react-icons/fi'
 import * as adminService from '../../services/adminService'
 import './Orders.css'
@@ -69,14 +71,24 @@ const DEFAULT_DELAY_NOTE =
   'We are working on it and will keep you updated.'
 
 // Payment display is derived, not raw: a cancelled/returned order that was
-// never paid owes nothing, and a COD "pending" means due on delivery
-const paymentBadge = (status, paymentStatus) => {
-  const pay = paymentStatus || 'pending'
-  if (pay === 'pending' && ['cancelled', 'returned'].includes(status)) {
+// never paid owes nothing, a COD "pending" means due on delivery, and a
+// replacement order is free by definition
+const paymentBadge = (order) => {
+  if (order.replacement_for) return { cls: 'replacement', label: 'no charge' }
+  const pay = order.payment_status || 'pending'
+  if (pay === 'pending' && ['cancelled', 'returned'].includes(order.status)) {
     return { cls: 'not_charged', label: 'not charged' }
   }
   if (pay === 'pending') return { cls: 'pending', label: 'pay on delivery' }
-  return { cls: pay, label: pay.replace('_', ' ') }
+  return { cls: pay, label: pay.replace(/_/g, ' ') }
+}
+
+const RETURN_REASON_LABELS = {
+  size: 'Size issue',
+  color: 'Color issue',
+  damaged: 'Damaged / defective',
+  not_as_described: 'Not as described',
+  other: 'Other',
 }
 
 // Human labels for status action buttons
@@ -136,7 +148,7 @@ const formatDateTime = (d) =>
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '')
 
 // ── Expanded row detail ──────────────────────────────────────
-const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
+const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate, onReplacementCreated }) => {
   const [status, setStatus] = useState(order.status)
   const [paymentStatus, setPaymentStatus] = useState(order.payment_status || 'pending')
   const [tracking, setTracking] = useState(order.tracking_number || '')
@@ -151,6 +163,11 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
   const [copiedField, setCopiedField] = useState(null)
   const [events, setEvents] = useState(null)
   const [showAllEvents, setShowAllEvents] = useState(false)
+  const [requests, setRequests] = useState(order.return_requests || [])
+  const [returnBusy, setReturnBusy] = useState(null)
+  const [rejectingId, setRejectingId] = useState(null)
+  const [rejectReason, setRejectReason] = useState('')
+  const [returnMsg, setReturnMsg] = useState('')
   const trackingInputRef = useRef(null)
 
   // Audit timeline (loads once per expand)
@@ -202,6 +219,71 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
       console.error('Failed to mark payment:', err)
     } finally {
       setSavingPayment(false)
+    }
+  }
+
+  // ── Return / replacement moderation ──
+  const syncRequest = (updated) => {
+    setRequests((prev) => prev.map((r) => (r.id === updated.id ? { ...r, ...updated } : r)))
+  }
+
+  // Do the non-rejected requests cover every item in the order?
+  const coversAllItems = (reqs) => {
+    const covered = new Set(
+      reqs.filter((r) => r.status !== 'rejected').flatMap((r) => (r.items || []).map((i) => i.order_item_id))
+    )
+    return (order.order_items || []).every((it) => covered.has(it.id))
+  }
+
+  const handleReturnAction = async (req, action) => {
+    setReturnBusy(req.id)
+    setReturnMsg('')
+    try {
+      if (action === 'approve') {
+        syncRequest(await adminService.updateReturnStatus(req.id, 'approved'))
+      } else if (action === 'reject') {
+        if (!rejectReason.trim()) { setReturnMsg('A reason is required to reject'); return }
+        syncRequest(await adminService.updateReturnStatus(req.id, 'rejected', { rejectionReason: rejectReason }))
+        setRejectingId(null)
+        setRejectReason('')
+      } else if (action === 'received') {
+        const updated = await adminService.updateReturnStatus(req.id, 'received')
+        syncRequest(updated)
+        // every item returned → the whole order is returned
+        const nextReqs = requests.map((r) => (r.id === updated.id ? updated : r))
+        if (coversAllItems(nextReqs) && ['delivered', 'completed'].includes(status)) {
+          const uo = await adminService.updateOrderStatus(order.id, 'returned', { fromStatus: status })
+          onStatusUpdate(order.id, uo)
+          setStatus('returned')
+          if (uo.payment_status) setPaymentStatus(uo.payment_status)
+        }
+      } else if (action === 'refund') {
+        if (status === 'returned') {
+          // full return — the order-level refund keeps payment in sync
+          const uo = await adminService.updateOrderStatus(order.id, 'refunded', { fromStatus: status })
+          onStatusUpdate(order.id, uo)
+          setStatus('refunded')
+          setPaymentStatus('refunded')
+        } else {
+          // partial return — money goes back for part of the order
+          const uo = await adminService.updatePaymentStatus(order.id, 'partially_refunded')
+          onStatusUpdate(order.id, uo)
+          setPaymentStatus('partially_refunded')
+        }
+        syncRequest(await adminService.updateReturnStatus(req.id, 'completed'))
+        setReturnMsg(`Refund of ${formatCurrency(req.refund_amount)} recorded`)
+      } else if (action === 'replacement') {
+        const newOrder = await adminService.createReplacementOrder(req.id)
+        syncRequest({ ...req, status: 'completed', replacement_order_id: newOrder.id })
+        setReturnMsg(`Replacement order ${newOrder.order_number} created`)
+        onReplacementCreated?.(newOrder)
+      }
+      adminService.getOrderEvents(order.id).then(setEvents).catch(() => {})
+    } catch (err) {
+      console.error('Return action failed:', err)
+      setReturnMsg('Action failed — please retry')
+    } finally {
+      setReturnBusy(null)
     }
   }
 
@@ -505,6 +587,148 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
             </div>
           )}
 
+          {/* Replacement order back-link */}
+          {order.replacement_for && (
+            <div className="adm-orders__detail-section">
+              <p className="adm-orders__detail-text adm-orders__detail-text--note">
+                <FiRepeat style={{ verticalAlign: 'text-top', marginRight: 6 }} />
+                Free replacement order — nothing is owed by the customer.
+              </p>
+            </div>
+          )}
+
+          {/* Return / replacement requests */}
+          {requests.length > 0 && (
+            <div className="adm-orders__detail-section">
+              <h4 className="adm-orders__detail-heading">Returns</h4>
+              {returnMsg && <p className="adm-orders__return-msg">{returnMsg}</p>}
+              {requests.map((req) => (
+                <div key={req.id} className={`adm-orders__return${req.status === 'rejected' ? ' adm-orders__return--rejected' : ''}`}>
+                  <div className="adm-orders__return-head">
+                    {req.type === 'refund' ? <FiRotateCcw /> : <FiRepeat />}
+                    <strong>{req.type === 'refund' ? 'Refund' : 'Replacement'} request</strong>
+                    <span className={`adm-badge adm-badge--return-${req.status}`}>{req.status}</span>
+                  </div>
+                  <p className="adm-orders__return-reason">
+                    {RETURN_REASON_LABELS[req.reason] || req.reason}
+                    {req.type === 'refund' && ` · ${formatCurrency(req.refund_amount)}`}
+                    {' · '}{formatDateTime(req.created_at)}
+                  </p>
+                  {req.description && (
+                    <p className="adm-orders__return-desc">"{req.description}"</p>
+                  )}
+                  <ul className="adm-orders__return-items">
+                    {(req.items || []).map((it) => (
+                      <li key={it.order_item_id}>
+                        {it.name} × {it.quantity}
+                        {req.type === 'replacement' && (it.replacement_size || it.replacement_color) && (
+                          <span className="adm-orders__return-swap">
+                            {' '}→ {[it.replacement_size, it.replacement_color].filter(Boolean).join(' / ')}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  {(req.photos || []).length > 0 && (
+                    <div className="adm-orders__return-photos">
+                      {req.photos.map((p, i) => (
+                        <img
+                          key={i}
+                          src={p}
+                          alt={`Return photo ${i + 1}`}
+                          onClick={(e) => e.currentTarget.classList.toggle('zoomed')}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  {req.status === 'rejected' && req.rejection_reason && (
+                    <p className="adm-orders__return-desc">Rejected: "{req.rejection_reason}"</p>
+                  )}
+
+                  {/* Stage actions */}
+                  {req.status === 'requested' && rejectingId !== req.id && (
+                    <div className="adm-orders__return-actions">
+                      <button
+                        className="adm-btn adm-btn--primary adm-btn--sm"
+                        disabled={returnBusy === req.id}
+                        onClick={() => handleReturnAction(req, 'approve')}
+                      >
+                        Approve return
+                      </button>
+                      <button
+                        className="adm-btn adm-btn--ghost adm-btn--sm"
+                        disabled={returnBusy === req.id}
+                        onClick={() => { setRejectingId(req.id); setRejectReason('') }}
+                      >
+                        Reject…
+                      </button>
+                    </div>
+                  )}
+                  {rejectingId === req.id && (
+                    <div className="adm-orders__return-reject">
+                      <textarea
+                        className="adm-input"
+                        rows={2}
+                        maxLength={300}
+                        placeholder="Reason shown to the customer…"
+                        value={rejectReason}
+                        onChange={(e) => setRejectReason(e.target.value)}
+                      />
+                      <div className="adm-orders__return-actions">
+                        <button
+                          className="adm-btn adm-btn--danger adm-btn--sm"
+                          disabled={returnBusy === req.id}
+                          onClick={() => handleReturnAction(req, 'reject')}
+                        >
+                          Reject request
+                        </button>
+                        <button
+                          className="adm-btn adm-btn--ghost adm-btn--sm"
+                          onClick={() => setRejectingId(null)}
+                        >
+                          Back
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {req.status === 'approved' && (
+                    <div className="adm-orders__return-actions">
+                      <button
+                        className="adm-btn adm-btn--primary adm-btn--sm"
+                        disabled={returnBusy === req.id}
+                        onClick={() => handleReturnAction(req, 'received')}
+                      >
+                        Mark item received
+                      </button>
+                    </div>
+                  )}
+                  {req.status === 'received' && req.type === 'refund' && (
+                    <div className="adm-orders__return-actions">
+                      <button
+                        className="adm-btn adm-btn--success adm-btn--sm"
+                        disabled={returnBusy === req.id}
+                        onClick={() => handleReturnAction(req, 'refund')}
+                      >
+                        Complete refund ({formatCurrency(req.refund_amount)})
+                      </button>
+                    </div>
+                  )}
+                  {req.status === 'received' && req.type === 'replacement' && (
+                    <div className="adm-orders__return-actions">
+                      <button
+                        className="adm-btn adm-btn--success adm-btn--sm"
+                        disabled={returnBusy === req.id}
+                        onClick={() => handleReturnAction(req, 'replacement')}
+                      >
+                        Create replacement order
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Audit timeline — compact one-line entries on a rail */}
           <div className="adm-orders__detail-section">
             <h4 className="adm-orders__detail-heading">Timeline</h4>
@@ -651,7 +875,7 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
           <label className="adm-orders__action-label">Payment</label>
           <div className="adm-orders__action-row">
             {(() => {
-              const pb = paymentBadge(status, paymentStatus)
+              const pb = paymentBadge({ replacement_for: order.replacement_for, status, payment_status: paymentStatus })
               return <span className={`adm-badge adm-badge--${pb.cls}`}>{pb.label}</span>
             })()}
             {paymentStatus === 'pending' && !['cancelled', 'returned', 'refunded'].includes(status) && (
@@ -953,15 +1177,24 @@ const Orders = () => {
                     (sum, i) => sum + (i.quantity || 1),
                     0
                   )
+                  const activeReturn = (order.return_requests || []).find((r) =>
+                    ['requested', 'approved', 'received'].includes(r.status)
+                  )
                   // A paid order that got cancelled/returned owes the
-                  // customer money — surface it and offer a one-click refund
+                  // customer money — unless a replacement resolves it
                   const refundDue =
                     ['cancelled', 'returned'].includes(order.status) &&
-                    order.payment_status === 'paid'
+                    order.payment_status === 'paid' &&
+                    !(order.return_requests || []).some(
+                      (r) => r.type === 'replacement' && ['received', 'completed'].includes(r.status)
+                    ) &&
+                    !activeReturn
                   // money action — expands to the detail where it's confirmed
                   const quick = refundDue
                     ? { to: 'refunded', label: 'Process refund', expand: true }
-                    : QUICK_ACTIONS[order.status]
+                    : activeReturn
+                      ? { expand: true, label: 'Review return' }
+                      : QUICK_ACTIONS[order.status]
                   const isStale =
                     STALE_STATUSES.includes(order.status) &&
                     Date.now() - new Date(order.created_at).getTime() > STALE_AFTER_MS
@@ -983,6 +1216,16 @@ const Orders = () => {
                               refund due
                             </span>
                           )}
+                          {activeReturn && (
+                            <span className="adm-orders__return-tag" title={`Return request: ${activeReturn.status}`}>
+                              <FiRotateCcw /> return · {activeReturn.status}
+                            </span>
+                          )}
+                          {order.replacement_for && (
+                            <span className="adm-orders__replacement-tag" title="Free replacement order">
+                              replacement
+                            </span>
+                          )}
                         </td>
                         <td className="adm-orders__email" data-label="Customer">
                           {order.customer_email || '—'}
@@ -1002,7 +1245,7 @@ const Orders = () => {
                         </td>
                         <td data-label="Payment">
                           {(() => {
-                            const pb = paymentBadge(order.status, order.payment_status)
+                            const pb = paymentBadge(order)
                             return <span className={`adm-badge adm-badge--${pb.cls}`}>{pb.label}</span>
                           })()}
                         </td>
@@ -1039,6 +1282,10 @@ const Orders = () => {
                           <td colSpan={9} className="adm-orders__detail-cell">
                             <OrderDetail
                               order={order}
+                              onReplacementCreated={(newOrder) => {
+                                setOrders((prev) => [{ ...newOrder, order_items: [], return_requests: [] }, ...prev])
+                                loadCounts()
+                              }}
                               onStatusUpdate={handleStatusUpdate}
                               onTrackingUpdate={handleTrackingUpdate}
                             />

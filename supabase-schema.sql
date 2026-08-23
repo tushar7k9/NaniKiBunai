@@ -1119,3 +1119,323 @@ BEGIN
   LIMIT 3;
 END;
 $$;
+
+
+-- ============================================================
+-- MIGRATION 2026-08-23h: per-item returns & replacements.
+-- Run this in the Supabase SQL Editor (safe to re-run).
+--
+-- Customers can request a return (refund or replacement) for specific
+-- items of a delivered, paid order within 7 days of delivery. Custom
+-- items are non-returnable. All rules are enforced server-side in
+-- request_return(). Replacements become linked ₹0 orders that flow
+-- through the normal fulfilment pipeline.
+-- ============================================================
+
+-- 1. Return requests (photos stored as compressed base64, like reviews)
+CREATE TABLE IF NOT EXISTS return_requests (
+  id BIGSERIAL PRIMARY KEY,
+  order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  type TEXT NOT NULL CHECK (type IN ('refund', 'replacement')),
+  reason TEXT NOT NULL CHECK (reason IN ('size', 'color', 'damaged', 'not_as_described', 'other')),
+  description TEXT CHECK (char_length(description) <= 1000),
+  photos TEXT[] NOT NULL DEFAULT '{}',
+  -- [{order_item_id, name, quantity, total_price, selected_size,
+  --   selected_color, replacement_size, replacement_color}]
+  items JSONB NOT NULL,
+  refund_amount NUMERIC(10, 2) NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'requested'
+    CHECK (status IN ('requested', 'approved', 'received', 'completed', 'rejected')),
+  rejection_reason TEXT CHECK (char_length(rejection_reason) <= 300),
+  replacement_order_id UUID REFERENCES orders(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_return_requests_order ON return_requests(order_id);
+
+ALTER TABLE return_requests ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view their own return requests" ON return_requests;
+CREATE POLICY "Users can view their own return requests" ON return_requests
+  FOR SELECT USING (
+    user_id = auth.uid()
+    OR (auth.jwt() ->> 'email') = 'nanikiibunai@gmail.com'
+  );
+
+-- Writes: creation only via the request_return() function (SECURITY
+-- DEFINER); moderation only by the admin
+DROP POLICY IF EXISTS "Admin can update return requests" ON return_requests;
+CREATE POLICY "Admin can update return requests" ON return_requests
+  FOR UPDATE USING ((auth.jwt() ->> 'email') = 'nanikiibunai@gmail.com');
+
+-- 2. Replacement orders link back to the original
+ALTER TABLE orders
+  ADD COLUMN IF NOT EXISTS replacement_for UUID REFERENCES orders(id) ON DELETE SET NULL;
+
+-- 3. Returns appear in the order audit timeline
+ALTER TABLE order_events DROP CONSTRAINT IF EXISTS order_events_event_type_check;
+ALTER TABLE order_events ADD CONSTRAINT order_events_event_type_check
+  CHECK (event_type IN ('created', 'status_change', 'payment_change', 'return_change'));
+
+CREATE OR REPLACE FUNCTION log_return_event()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_actor TEXT;
+  v_note TEXT;
+BEGIN
+  IF (auth.jwt() ->> 'email') = 'nanikiibunai@gmail.com' THEN
+    v_actor := 'admin';
+  ELSIF auth.uid() IS NOT NULL AND auth.uid() = NEW.user_id THEN
+    v_actor := 'customer';
+  ELSE
+    v_actor := 'system';
+  END IF;
+
+  IF TG_OP = 'INSERT' THEN
+    v_note := initcap(NEW.type) || ' requested for ' ||
+              jsonb_array_length(NEW.items) || ' item(s)';
+    INSERT INTO order_events (order_id, event_type, to_status, actor, note)
+    VALUES (NEW.order_id, 'return_change', NEW.status, v_actor, v_note);
+  ELSIF NEW.status IS DISTINCT FROM OLD.status THEN
+    v_note := CASE NEW.status
+      WHEN 'approved'  THEN 'Return approved — pickup being arranged'
+      WHEN 'received'  THEN 'Returned item(s) received'
+      WHEN 'completed' THEN CASE WHEN NEW.type = 'refund'
+                                 THEN 'Refund of ₹' || NEW.refund_amount || ' completed'
+                                 ELSE 'Replacement order created' END
+      WHEN 'rejected'  THEN 'Return rejected' ||
+                            coalesce(': ' || NEW.rejection_reason, '')
+    END;
+    INSERT INTO order_events (order_id, event_type, from_status, to_status, actor, note)
+    VALUES (NEW.order_id, 'return_change', OLD.status, NEW.status, v_actor, v_note);
+  END IF;
+  RETURN NULL;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS return_requests_log_event ON return_requests;
+CREATE TRIGGER return_requests_log_event
+  AFTER INSERT OR UPDATE ON return_requests
+  FOR EACH ROW EXECUTE FUNCTION log_return_event();
+
+-- 4. Return request state machine (mirrors the order guard style)
+CREATE OR REPLACE FUNCTION enforce_return_transition()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+BEGIN
+  IF current_user IN ('postgres', 'supabase_admin') OR auth.role() = 'service_role' THEN
+    RETURN NEW;
+  END IF;
+
+  IF NEW.status IS DISTINCT FROM OLD.status THEN
+    IF NOT (
+      (OLD.status = 'requested' AND NEW.status IN ('approved', 'rejected')) OR
+      (OLD.status = 'approved'  AND NEW.status IN ('received', 'rejected')) OR
+      (OLD.status = 'received'  AND NEW.status = 'completed')
+    ) THEN
+      RAISE EXCEPTION 'INVALID_RETURN_TRANSITION: % -> %', OLD.status, NEW.status;
+    END IF;
+    IF NEW.status = 'rejected' AND coalesce(trim(NEW.rejection_reason), '') = '' THEN
+      RAISE EXCEPTION 'REJECTION_REASON_REQUIRED';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS return_requests_enforce_transition ON return_requests;
+CREATE TRIGGER return_requests_enforce_transition
+  BEFORE UPDATE ON return_requests
+  FOR EACH ROW EXECUTE FUNCTION enforce_return_transition();
+
+-- 5. Orders: allow completed → returned (a return can conclude after the
+-- admin already marked the order completed, still inside the 7-day window)
+CREATE OR REPLACE FUNCTION enforce_order_transition()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+BEGIN
+  -- maintenance escape hatch: SQL editor (postgres) and service role
+  IF current_user IN ('postgres', 'supabase_admin') OR auth.role() = 'service_role' THEN
+    IF NEW.status = 'refunded' AND NEW.status IS DISTINCT FROM OLD.status THEN
+      NEW.payment_status := 'refunded';
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  IF NEW.status IS DISTINCT FROM OLD.status THEN
+    IF NOT (
+      (OLD.status = 'pending'    AND NEW.status IN ('confirmed', 'cancelled')) OR
+      (OLD.status = 'confirmed'  AND NEW.status IN ('processing', 'cancelled')) OR
+      (OLD.status = 'processing' AND NEW.status IN ('shipped', 'cancelled')) OR
+      (OLD.status = 'shipped'    AND NEW.status IN ('delivered', 'processing')) OR
+      (OLD.status = 'delivered'  AND NEW.status IN ('completed', 'returned', 'shipped')) OR
+      (OLD.status = 'completed'  AND NEW.status = 'returned') OR
+      (OLD.status = 'cancelled'  AND NEW.status = 'refunded') OR
+      (OLD.status = 'returned'   AND NEW.status = 'refunded')
+    ) THEN
+      RAISE EXCEPTION 'INVALID_ORDER_TRANSITION: % -> %', OLD.status, NEW.status;
+    END IF;
+
+    IF NEW.status = 'refunded' THEN
+      IF OLD.payment_status <> 'paid' THEN
+        RAISE EXCEPTION 'REFUND_REQUIRES_PAYMENT';
+      END IF;
+      NEW.payment_status := 'refunded';
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+-- 6. Customers create return requests ONLY through this function — it
+-- enforces ownership, delivery, payment, the 7-day window, per-item
+-- eligibility, and no-duplicate rules atomically.
+CREATE OR REPLACE FUNCTION request_return(
+  p_order_id UUID,
+  p_type TEXT,
+  p_reason TEXT,
+  p_description TEXT,
+  p_photos TEXT[],
+  p_items JSONB
+)
+RETURNS SETOF return_requests
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_order orders%ROWTYPE;
+  v_item RECORD;
+  v_req JSONB;
+  v_enriched JSONB := '[]'::jsonb;
+  v_refund NUMERIC(10, 2) := 0;
+BEGIN
+  SELECT * INTO v_order FROM orders
+  WHERE id = p_order_id
+    AND (
+      user_id = auth.uid()
+      OR (user_id IS NULL AND lower(customer_email) = lower(auth.jwt() ->> 'email'))
+    );
+  IF NOT FOUND THEN RAISE EXCEPTION 'RETURN_ORDER_NOT_FOUND'; END IF;
+
+  IF v_order.replacement_for IS NOT NULL THEN RAISE EXCEPTION 'RETURN_NOT_ELIGIBLE_REPLACEMENT'; END IF;
+  IF v_order.status NOT IN ('delivered', 'completed') THEN RAISE EXCEPTION 'RETURN_NOT_DELIVERED'; END IF;
+  IF v_order.payment_status <> 'paid' THEN RAISE EXCEPTION 'RETURN_NOT_PAID'; END IF;
+  IF v_order.delivered_at IS NULL OR now() > v_order.delivered_at + interval '7 days' THEN
+    RAISE EXCEPTION 'RETURN_WINDOW_EXPIRED';
+  END IF;
+  IF p_type NOT IN ('refund', 'replacement') OR p_reason NOT IN ('size', 'color', 'damaged', 'not_as_described', 'other') THEN
+    RAISE EXCEPTION 'RETURN_INVALID_INPUT';
+  END IF;
+  IF coalesce(array_length(p_photos, 1), 0) < 1 OR array_length(p_photos, 1) > 4 THEN
+    RAISE EXCEPTION 'RETURN_PHOTOS_REQUIRED';
+  END IF;
+  IF p_items IS NULL OR jsonb_typeof(p_items) <> 'array' OR jsonb_array_length(p_items) < 1 THEN
+    RAISE EXCEPTION 'RETURN_NO_ITEMS';
+  END IF;
+
+  FOR v_req IN SELECT * FROM jsonb_array_elements(p_items) LOOP
+    SELECT * INTO v_item FROM order_items
+    WHERE id = (v_req ->> 'order_item_id')::int AND order_id = p_order_id;
+    IF NOT FOUND THEN RAISE EXCEPTION 'RETURN_ITEM_NOT_IN_ORDER'; END IF;
+
+    IF v_item.selected_size = 'Custom'
+       OR (v_item.product_snapshot ->> 'customer_instructions') IS NOT NULL THEN
+      RAISE EXCEPTION 'RETURN_ITEM_CUSTOM';
+    END IF;
+
+    IF EXISTS (
+      SELECT 1 FROM return_requests rr
+      WHERE rr.order_id = p_order_id AND rr.status <> 'rejected'
+        AND rr.items @> jsonb_build_array(jsonb_build_object('order_item_id', v_item.id))
+    ) THEN
+      RAISE EXCEPTION 'RETURN_ITEM_ALREADY_REQUESTED';
+    END IF;
+
+    v_refund := v_refund + v_item.total_price;
+    v_enriched := v_enriched || jsonb_build_array(jsonb_build_object(
+      'order_item_id', v_item.id,
+      'name', coalesce(v_item.product_snapshot ->> 'name', 'Item'),
+      'quantity', v_item.quantity,
+      'total_price', v_item.total_price,
+      'selected_size', v_item.selected_size,
+      'selected_color', v_item.selected_color,
+      'replacement_size', v_req ->> 'replacement_size',
+      'replacement_color', v_req ->> 'replacement_color'
+    ));
+  END LOOP;
+
+  RETURN QUERY
+  INSERT INTO return_requests
+    (order_id, user_id, type, reason, description, photos, items, refund_amount)
+  VALUES
+    (p_order_id, auth.uid(), p_type, p_reason,
+     nullif(left(trim(coalesce(p_description, '')), 1000), ''),
+     p_photos, v_enriched, v_refund)
+  RETURNING *;
+END;
+$$;
+
+-- 7. Admin creates the linked ₹0 replacement order atomically
+CREATE OR REPLACE FUNCTION create_replacement_order(p_request_id BIGINT)
+RETURNS SETOF orders
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_req return_requests%ROWTYPE;
+  v_order orders%ROWTYPE;
+  v_new_id UUID := gen_random_uuid();
+  v_item JSONB;
+  v_src order_items%ROWTYPE;
+BEGIN
+  IF (auth.jwt() ->> 'email') <> 'nanikiibunai@gmail.com' THEN
+    RAISE EXCEPTION 'ADMIN_ONLY';
+  END IF;
+
+  SELECT * INTO v_req FROM return_requests WHERE id = p_request_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'REQUEST_NOT_FOUND'; END IF;
+  IF v_req.type <> 'replacement' THEN RAISE EXCEPTION 'REQUEST_NOT_REPLACEMENT'; END IF;
+  IF v_req.status <> 'received' THEN RAISE EXCEPTION 'REQUEST_NOT_RECEIVED'; END IF;
+  IF v_req.replacement_order_id IS NOT NULL THEN RAISE EXCEPTION 'REPLACEMENT_EXISTS'; END IF;
+
+  SELECT * INTO v_order FROM orders WHERE id = v_req.order_id;
+
+  INSERT INTO orders (id, order_number, user_id, status, subtotal, shipping_cost,
+    tax_amount, discount_amount, total_amount, shipping_address, customer_email,
+    customer_phone, payment_status, payment_method, replacement_for)
+  VALUES (v_new_id,
+    'ORD-' || to_char(now(), 'YYYYMMDD') || '-R' || p_request_id,
+    v_order.user_id, 'confirmed', 0, 0, 0, 0, 0,
+    v_order.shipping_address, v_order.customer_email, v_order.customer_phone,
+    'paid', 'replacement', v_req.order_id);
+
+  FOR v_item IN SELECT * FROM jsonb_array_elements(v_req.items) LOOP
+    SELECT * INTO v_src FROM order_items WHERE id = (v_item ->> 'order_item_id')::int;
+    INSERT INTO order_items (order_id, product_id, product_snapshot, quantity,
+      price_per_unit, total_price, selected_color, selected_size)
+    VALUES (v_new_id, v_src.product_id, v_src.product_snapshot, v_src.quantity,
+      0, 0,
+      coalesce(nullif(v_item ->> 'replacement_color', ''), v_src.selected_color),
+      coalesce(nullif(v_item ->> 'replacement_size', ''), v_src.selected_size));
+  END LOOP;
+
+  UPDATE return_requests
+  SET replacement_order_id = v_new_id, status = 'completed', updated_at = now()
+  WHERE id = p_request_id;
+
+  RETURN QUERY SELECT * FROM orders WHERE id = v_new_id;
+END;
+$$;
