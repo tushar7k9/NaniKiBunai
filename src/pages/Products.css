@@ -72,7 +72,7 @@
 /* ── Filter Bar ── */
 .products-filter-bar {
   position: sticky;
-  top: 72px;
+  top: calc(72px + var(--banner-h, 0px));
   z-index: 20;
   background: rgba(250, 249, 246, 0.85);
   backdrop-filter: blur(16px);

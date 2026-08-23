@@ -2,6 +2,8 @@
   min-height: 100vh;
   width: 100%;
   overflow-x: hidden;
+  /* Shifts all page content below the announcement banner when active */
+  padding-top: var(--banner-h, 0px);
 }
 
 /* Smooth scroll */

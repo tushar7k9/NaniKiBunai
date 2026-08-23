@@ -107,6 +107,33 @@ CREATE TABLE IF NOT EXISTS reviews (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- 7. STORE_SETTINGS TABLE (singleton row — admin-controlled store-wide modes)
+CREATE TABLE IF NOT EXISTS store_settings (
+  id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  maintenance_mode BOOLEAN NOT NULL DEFAULT false,
+  maintenance_message TEXT DEFAULT '' CHECK (char_length(maintenance_message) <= 300),
+  orders_paused BOOLEAN NOT NULL DEFAULT false,
+  orders_paused_message TEXT DEFAULT '' CHECK (char_length(orders_paused_message) <= 250),
+  banner_enabled BOOLEAN NOT NULL DEFAULT false,
+  banner_text TEXT DEFAULT '' CHECK (char_length(banner_text) <= 250),
+  theme TEXT NOT NULL DEFAULT 'default' CHECK (theme IN ('default', 'diwali', 'holiday')),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+INSERT INTO store_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
+-- Whether the store currently accepts new orders (used by the orders
+-- INSERT policy). STABLE + pinned search_path; settings are public-read
+-- so no SECURITY DEFINER is needed.
+CREATE OR REPLACE FUNCTION store_accepts_orders()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SET search_path = public
+AS $$
+  SELECT NOT (maintenance_mode OR orders_paused) FROM store_settings WHERE id = 1
+$$;
+
 -- ============================================
 -- INDEXES
 -- ============================================
@@ -134,6 +161,18 @@ ALTER TABLE favorites ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
+ALTER TABLE store_settings ENABLE ROW LEVEL SECURITY;
+
+-- STORE_SETTINGS: public read (store modes are public info), admin-only
+-- write, no INSERT/DELETE policies (seed row is created by the owner)
+CREATE POLICY "Store settings are viewable by everyone"
+  ON store_settings FOR SELECT
+  USING (true);
+
+CREATE POLICY "Admin can update store settings"
+  ON store_settings FOR UPDATE
+  USING ((auth.jwt() ->> 'email') = 'nanikiibunai@gmail.com')
+  WITH CHECK ((auth.jwt() ->> 'email') = 'nanikiibunai@gmail.com');
 
 -- PRODUCTS: Anyone can read active products
 CREATE POLICY "Products are viewable by everyone"
@@ -175,9 +214,15 @@ CREATE POLICY "Users can view their own orders"
   ON orders FOR SELECT
   USING (auth.uid() = user_id);
 
-CREATE POLICY "Anyone can create orders"
+-- Orders can be created while the store is open (maintenance / orders
+-- pause blocks them at the database level, not just in the UI). The
+-- admin can always place orders (e.g. test orders while paused).
+CREATE POLICY "Orders allowed when store is open"
   ON orders FOR INSERT
-  WITH CHECK (true);
+  WITH CHECK (
+    coalesce(store_accepts_orders(), true) -- fail-open if settings row missing
+    OR (auth.jwt() ->> 'email') = 'nanikiibunai@gmail.com'
+  );
 
 CREATE POLICY "Users can update their own orders"
   ON orders FOR UPDATE
@@ -499,3 +544,67 @@ CREATE POLICY "Users can view their own order items"
 ALTER TABLE products
   ADD COLUMN IF NOT EXISTS stock_quantity INTEGER,
   ADD COLUMN IF NOT EXISTS low_stock_threshold INTEGER DEFAULT 10;
+
+-- ============================================
+-- MIGRATION 2026-08-23b: store settings (admin-controlled maintenance
+-- mode, announcement banner, orders pause, festive theme) with
+-- database-level order blocking and Realtime broadcasting.
+-- The base definitions above already include this for fresh installs —
+-- run ONLY this section in the SQL Editor to upgrade an existing
+-- database. Idempotent: safe to re-run.
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS store_settings (
+  id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  maintenance_mode BOOLEAN NOT NULL DEFAULT false,
+  maintenance_message TEXT DEFAULT '' CHECK (char_length(maintenance_message) <= 300),
+  orders_paused BOOLEAN NOT NULL DEFAULT false,
+  orders_paused_message TEXT DEFAULT '' CHECK (char_length(orders_paused_message) <= 250),
+  banner_enabled BOOLEAN NOT NULL DEFAULT false,
+  banner_text TEXT DEFAULT '' CHECK (char_length(banner_text) <= 250),
+  theme TEXT NOT NULL DEFAULT 'default' CHECK (theme IN ('default', 'diwali', 'holiday')),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+INSERT INTO store_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
+ALTER TABLE store_settings ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Store settings are viewable by everyone" ON store_settings;
+CREATE POLICY "Store settings are viewable by everyone"
+  ON store_settings FOR SELECT
+  USING (true);
+
+DROP POLICY IF EXISTS "Admin can update store settings" ON store_settings;
+CREATE POLICY "Admin can update store settings"
+  ON store_settings FOR UPDATE
+  USING ((auth.jwt() ->> 'email') = 'nanikiibunai@gmail.com')
+  WITH CHECK ((auth.jwt() ->> 'email') = 'nanikiibunai@gmail.com');
+
+CREATE OR REPLACE FUNCTION store_accepts_orders()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SET search_path = public
+AS $$
+  SELECT NOT (maintenance_mode OR orders_paused) FROM store_settings WHERE id = 1
+$$;
+
+-- Enforce order blocking at the database (stale tabs / tampered clients
+-- can't order while the store is paused); admin can always order
+DROP POLICY IF EXISTS "Anyone can create orders" ON orders;
+DROP POLICY IF EXISTS "Orders allowed when store is open" ON orders;
+CREATE POLICY "Orders allowed when store is open"
+  ON orders FOR INSERT
+  WITH CHECK (
+    coalesce(store_accepts_orders(), true)
+    OR (auth.jwt() ->> 'email') = 'nanikiibunai@gmail.com'
+  );
+
+-- Broadcast settings changes to all connected clients (safe to re-run)
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE store_settings;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;

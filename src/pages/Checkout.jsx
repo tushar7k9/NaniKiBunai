@@ -5,6 +5,7 @@ import { FiShoppingBag, FiLock, FiMessageSquare, FiX, FiTruck, FiShield, FiArrow
 import { useCart } from '../hooks/useCart'
 import { useAuth } from '../hooks/useAuth'
 import { useProducts } from '../hooks/useProducts'
+import { useStoreSettings } from '../hooks/useStoreSettings'
 import { orderService } from '../services/orderService'
 import {
   hydrateCartItems,
@@ -50,6 +51,11 @@ const Checkout = () => {
   const { cart, clearCart } = useCart()
   const { user, isAuthenticated } = useAuth()
   const { products } = useProducts()
+  const { settings, ordersBlocked } = useStoreSettings()
+
+  const pauseMessage =
+    settings.orders_paused_message?.trim() ||
+    'Orders are temporarily paused — please check back soon.'
 
   // Reconcile cart against the live catalog: fresh prices/stock, and flags
   // for items that became unavailable since they were added
@@ -103,6 +109,13 @@ const Checkout = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+
+    // Gate 0: the store isn't accepting orders right now (the database
+    // enforces this too — see the orders INSERT policy)
+    if (ordersBlocked) {
+      setOrderError(pauseMessage)
+      return
+    }
 
     // Gate 1: issues already known from the hydrated cart
     if (issues.hasBlockingIssues) {
@@ -168,7 +181,15 @@ const Checkout = () => {
       }
     } catch (error) {
       console.error('Error placing order:', error)
-      setOrderError(error.message || 'Failed to place order. Please try again.')
+      // The DB refuses orders while the store is paused (RLS) — a stale
+      // tab can hit this even though the UI gate didn't catch it
+      const isRlsRejection =
+        error?.code === '42501' || /row-level security/i.test(error?.message || '')
+      setOrderError(
+        isRlsRejection
+          ? 'Ordering is temporarily paused — please try again later.'
+          : error.message || 'Failed to place order. Please try again.'
+      )
       setIsProcessing(false)
     }
   }
@@ -370,7 +391,7 @@ const Checkout = () => {
                   <motion.button
                     className="co-place-order-btn"
                     onClick={handleSubmit}
-                    disabled={isProcessing || issues.hasBlockingIssues}
+                    disabled={isProcessing || issues.hasBlockingIssues || ordersBlocked}
                     whileTap={{ scale: 0.98 }}
                   >
                     {isProcessing ? 'Processing...' : `Place Order — ₹${total.toFixed(0)}`}
@@ -385,7 +406,12 @@ const Checkout = () => {
         <div className="co-summary">
           <h3 className="co-summary__title">Summary</h3>
 
-          {issues.hasBlockingIssues && (
+          {ordersBlocked && (
+            <div className="co-error co-error--availability">
+              <FiAlertTriangle /> {pauseMessage}
+            </div>
+          )}
+          {!ordersBlocked && issues.hasBlockingIssues && (
             <div className="co-error co-error--availability">
               <FiAlertTriangle /> {issues.summary}. Please update your bag before placing the order.
             </div>

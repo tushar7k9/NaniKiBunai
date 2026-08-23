@@ -46,6 +46,33 @@
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* ═══════════════════════════════════════════
+   Festive themes — applied via data-theme on <html>, driven by the
+   admin's store settings. Only accent variables change; text and the
+   deep-brown base stay for readability. (Collections and Our Story use
+   hardcoded colors and keep the default look — known limitation.)
+   ═══════════════════════════════════════════ */
+
+[data-theme='diwali'] {
+  --terracotta: #C98A2D;
+  --terracotta-dark: #A8701F;
+  --terracotta-light: #EDC272;
+  --rose-blush: #F6E3B4;
+  --accent-gold: #E3B23C;
+  --section-bg-alt: #F7EFDD;
+  --border-subtle: rgba(201, 138, 45, 0.18);
+}
+
+[data-theme='holiday'] {
+  --terracotta: #4E7A5A;
+  --terracotta-dark: #3B6146;
+  --terracotta-light: #A9CBB4;
+  --rose-blush: #E4EFE7;
+  --accent-gold: #C0392B;
+  --section-bg-alt: #EDF3EE;
+  --border-subtle: rgba(78, 122, 90, 0.18);
+}
+
 /* Hide the document scrollbar everywhere — scrolling still works via
    wheel / trackpad / keys / touch. Applied on html AND body since either
    can own the page scroller depending on the browser. */

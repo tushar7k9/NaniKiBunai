@@ -20,6 +20,7 @@ export const CartProvider = ({ children }) => {
 
   const { user, isAuthenticated } = useAuth()
   const previousAuthState = useRef(isAuthenticated)
+  const hasLoadedRef = useRef(false) // guards the guest persist effect
   /**
    * Load cart when user authentication changes
    * If user just logged in, sync guest cart first
@@ -50,10 +51,13 @@ export const CartProvider = ({ children }) => {
 
   /**
    * Save to localStorage ONLY for guest users
-   * Don't save if authenticated (data is in Supabase)
+   * Don't save if authenticated (data is in Supabase).
+   * Guarded on the first load having completed — otherwise a render
+   * race can persist the initial empty cart over a real guest cart
+   * before loadCart has read it (observed intermittently).
    */
   useEffect(() => {
-    if (!loading && !isAuthenticated && cart.length >= 0) {
+    if (hasLoadedRef.current && !loading && !isAuthenticated) {
       cartStorage.set(cart)
     }
   }, [cart, loading, isAuthenticated])
@@ -124,6 +128,7 @@ export const CartProvider = ({ children }) => {
       const localCart = cartStorage.get()
       setCart(localCart || [])
     } finally {
+      hasLoadedRef.current = true
       setLoading(false)
     }
   }

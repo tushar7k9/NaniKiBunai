@@ -251,6 +251,31 @@ export const getUnreadCount = async () => {
   return count || 0
 }
 
+// ── Store Settings ──
+
+export const getStoreSettings = async () => {
+  const { data, error } = await supabase
+    .from('store_settings')
+    .select('*')
+    .eq('id', 1)
+    .maybeSingle()
+
+  if (error) throw error
+  return data
+}
+
+export const updateStoreSettings = async (patch) => {
+  const { data, error } = await supabase
+    .from('store_settings')
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq('id', 1)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
 // ── Users (via admin-users edge function) ──
 // auth.users can't be read with the anon key; the edge function verifies
 // the caller's JWT is the admin, then lists users with the service role.

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FiX, FiPlus, FiMinus, FiTrash2, FiShoppingBag, FiArrowRight, FiAlertTriangle } from 'react-icons/fi'
 import { useProducts } from '../hooks/useProducts'
+import { useStoreSettings } from '../hooks/useStoreSettings'
 import { hydrateCartItems, getCartIssues, getOrderableSubtotal } from '../utils/cartAvailability'
 import './Cart.css'
 
@@ -61,8 +62,13 @@ const spawnParticles = (rect, containerEl) => {
 const Cart = ({ isOpen, onClose, cartItems, updateQuantity, removeFromCart }) => {
   const navigate = useNavigate()
   const { products, refreshProducts } = useProducts()
+  const { settings, ordersBlocked } = useStoreSettings()
   const [removingId, setRemovingId] = useState(null)
   const itemRefs = useRef({})
+
+  const pauseMessage =
+    settings.orders_paused_message?.trim() ||
+    'Orders are temporarily paused — please check back soon.'
 
   // Re-check the catalog whenever the drawer opens so availability, stock,
   // and prices reflect what the admin has changed since page load
@@ -105,7 +111,7 @@ const Cart = ({ isOpen, onClose, cartItems, updateQuantity, removeFromCart }) =>
     items.reduce((total, item) => total + item.quantity, 0)
 
   const handleCheckout = () => {
-    if (issues.hasBlockingIssues) return
+    if (issues.hasBlockingIssues || ordersBlocked) return
     onClose()
     navigate('/checkout', { state: { fromCart: true } })
   }
@@ -278,7 +284,12 @@ const Cart = ({ isOpen, onClose, cartItems, updateQuantity, removeFromCart }) =>
             {/* Footer */}
             {items.length > 0 && (
               <div className="cart-footer">
-                {issues.hasBlockingIssues && (
+                {ordersBlocked && (
+                  <div className="cart-footer__warning">
+                    <FiAlertTriangle /> {pauseMessage}
+                  </div>
+                )}
+                {!ordersBlocked && issues.hasBlockingIssues && (
                   <div className="cart-footer__warning">
                     <FiAlertTriangle /> {issues.summary}
                   </div>
@@ -293,7 +304,7 @@ const Cart = ({ isOpen, onClose, cartItems, updateQuantity, removeFromCart }) =>
                 <button
                   className="cart-footer__checkout"
                   onClick={handleCheckout}
-                  disabled={issues.hasBlockingIssues}
+                  disabled={issues.hasBlockingIssues || ordersBlocked}
                 >
                   Checkout
                   <FiArrowRight />

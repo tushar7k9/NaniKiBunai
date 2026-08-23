@@ -9,6 +9,7 @@ import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-route
 
 // Context Providers
 import { AuthProvider } from './contexts/AuthContext'
+import { StoreSettingsProvider } from './contexts/StoreSettingsContext'
 import { ProductsProvider } from './contexts/ProductsContext'
 import { CartProvider } from './contexts/CartContext'
 import { FavoritesProvider } from './contexts/FavoritesContext'
@@ -18,6 +19,8 @@ import { FlyToCartProvider, useFlyToCart } from './components/FlyToCart'
 import Header from './components/Header'
 import Cart from './components/Cart'
 import SearchOverlay from './components/SearchOverlay'
+import MaintenanceGate from './components/MaintenanceGate'
+import AnnouncementBanner from './components/AnnouncementBanner'
 import Hero from './components/Hero'
 import Categories from './components/Categories'
 import FeaturedProducts from './components/FeaturedProducts'
@@ -51,6 +54,7 @@ const AdminMessages = React.lazy(() => import('./pages/admin/Messages'))
 const AdminUsers = React.lazy(() => import('./pages/admin/Users'))
 const AdminUserDetail = React.lazy(() => import('./pages/admin/UserDetail'))
 const AdminAnalytics = React.lazy(() => import('./pages/admin/Analytics'))
+const AdminSettings = React.lazy(() => import('./pages/admin/Settings'))
 
 // Inline styles: the admin CSS itself is lazy, so the fallback can't rely on it
 const AdminFallback = () => (
@@ -134,11 +138,13 @@ function AppContent() {
           <Route path="users/:userId" element={<AdminUserDetail />} />
           <Route path="reviews" element={<AdminReviews />} />
           <Route path="messages" element={<AdminMessages />} />
+          <Route path="settings" element={<AdminSettings />} />
         </Route>
 
         {/* Store routes */}
         <Route path="*" element={
           <div className="App">
+            <AnnouncementBanner />
             <Header
               cartCount={getTotalItems()}
               favoritesCount={getFavoritesCount()}
@@ -158,19 +164,21 @@ function AppContent() {
               updateQuantity={updateQuantity}
               removeFromCart={removeFromCart}
             />
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/products" element={<Products />} />
-              <Route path="/product/:id" element={<ProductDetail />} />
-              <Route path="/favorites" element={<Favorites />} />
-              <Route path="/collections" element={<Collections />} />
-              <Route path="/contact" element={<Contact />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/checkout" element={<Checkout />} />
-              <Route path="/orders" element={<Orders />} />
-            </Routes>
+            <MaintenanceGate>
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/products" element={<Products />} />
+                <Route path="/product/:id" element={<ProductDetail />} />
+                <Route path="/favorites" element={<Favorites />} />
+                <Route path="/collections" element={<Collections />} />
+                <Route path="/contact" element={<Contact />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/checkout" element={<Checkout />} />
+                <Route path="/orders" element={<Orders />} />
+              </Routes>
+            </MaintenanceGate>
             <Footer />
           </div>
         } />
@@ -190,15 +198,17 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <ProductsProvider>
-        <CartProvider>
-          <FavoritesProvider>
-            <FlyToCartProvider>
-              <AppContent />
-            </FlyToCartProvider>
-          </FavoritesProvider>
-        </CartProvider>
-      </ProductsProvider>
+      <StoreSettingsProvider>
+        <ProductsProvider>
+          <CartProvider>
+            <FavoritesProvider>
+              <FlyToCartProvider>
+                <AppContent />
+              </FlyToCartProvider>
+            </FavoritesProvider>
+          </CartProvider>
+        </ProductsProvider>
+      </StoreSettingsProvider>
     </AuthProvider>
   )
 }

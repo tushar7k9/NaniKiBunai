@@ -59,7 +59,7 @@
 /* ── Gallery ── */
 .pd-gallery {
   position: sticky;
-  top: 100px;
+  top: calc(100px + var(--banner-h, 0px));
   display: flex;
   flex-direction: column;
   gap: 12px;

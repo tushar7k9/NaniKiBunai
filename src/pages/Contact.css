@@ -364,7 +364,7 @@
   flex-direction: column;
   gap: 16px;
   position: sticky;
-  top: 100px;
+  top: calc(100px + var(--banner-h, 0px));
 }
 
 .ct-side-card {
