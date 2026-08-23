@@ -217,7 +217,6 @@ export const ProductsProvider = ({ children }) => {
           .order('created_at', { ascending: false })
 
         if (error) throw error
-        console.log('Products loaded from Supabase:', data)
         setProducts(data || [])
       } else {
         // Use static data
@@ -228,7 +227,6 @@ export const ProductsProvider = ({ children }) => {
       setError(err.message)
 
       // Fallback to static data on error
-      console.log('Falling back to static product data')
       setProducts(STATIC_PRODUCTS)
     } finally {
       setLoading(false)

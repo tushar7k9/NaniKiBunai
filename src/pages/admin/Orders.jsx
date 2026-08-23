@@ -21,6 +21,7 @@ const ORDER_STATUSES = [
   'delivered',
   'completed',
   'cancelled',
+  'returned',
   'refunded',
 ]
 
@@ -30,9 +31,10 @@ const STATUS_TRANSITIONS = {
   confirmed: ['processing', 'cancelled'],
   processing: ['shipped', 'cancelled'],
   shipped: ['delivered', 'processing'],
-  delivered: ['completed', 'shipped'],
+  delivered: ['completed', 'returned', 'shipped'],
   completed: [],
   cancelled: ['refunded'],
+  returned: ['refunded'],
   refunded: [],
 }
 
@@ -43,6 +45,7 @@ const TRACKING_VISIBLE_STATUSES = ['processing', 'shipped', 'delivered']
 const CONFIRM_TRANSITIONS = {
   'shipped→processing': 'This will clear the tracking number and shipment date. Continue?',
   'delivered→shipped': 'This will clear the delivery date. Continue?',
+  'delivered→returned': 'Mark this order as returned by the customer? It will be excluded from revenue. Continue?',
 }
 
 const formatDate = (d) =>
@@ -646,32 +649,32 @@ const Orders = () => {
                         className={`adm-orders__row${isExpanded ? ' adm-orders__row--expanded' : ''}`}
                         onClick={() => toggleRow(order.id)}
                       >
-                        <td className="adm-orders__order-num">
+                        <td className="adm-orders__order-num" data-cell="title">
                           {order.order_number || order.id.slice(0, 8).toUpperCase()}
                         </td>
-                        <td className="adm-orders__email">
+                        <td className="adm-orders__email" data-label="Customer">
                           {order.customer_email || '—'}
                         </td>
-                        <td className="adm-orders__date">
+                        <td className="adm-orders__date" data-label="Date">
                           {formatDate(order.created_at)}
                         </td>
-                        <td className="adm-orders__count">{itemCount}</td>
-                        <td className="adm-orders__total">
+                        <td className="adm-orders__count" data-label="Items">{itemCount}</td>
+                        <td className="adm-orders__total" data-label="Total">
                           {formatCurrency(order.total_amount)}
                         </td>
-                        <td>
+                        <td data-label="Status">
                           <span className={`adm-badge adm-badge--${order.status}`}>
                             {order.status}
                           </span>
                         </td>
-                        <td>
+                        <td data-label="Payment">
                           <span
                             className={`adm-badge adm-badge--${order.payment_status || 'pending'}`}
                           >
                             {order.payment_status || 'pending'}
                           </span>
                         </td>
-                        <td className="adm-orders__chevron-cell">
+                        <td className="adm-orders__chevron-cell" data-cell="expand">
                           {isExpanded ? (
                             <FiChevronUp className="adm-orders__chevron" />
                           ) : (
@@ -681,7 +684,7 @@ const Orders = () => {
                       </tr>
 
                       {isExpanded && (
-                        <tr className="adm-orders__detail-row">
+                        <tr className="adm-orders__detail-row" data-row="detail">
                           <td colSpan={8} className="adm-orders__detail-cell">
                             <OrderDetail
                               order={order}

@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   FiPackage, FiTruck, FiCheckCircle, FiXCircle, FiClock,
-  FiChevronDown, FiExternalLink, FiAlertCircle,
+  FiChevronDown, FiExternalLink, FiAlertCircle, FiRotateCcw,
 } from 'react-icons/fi'
 import { useAuth } from '../hooks/useAuth'
 import { orderService } from '../services/orderService'
@@ -18,6 +18,7 @@ const statusConfig = {
   delivered:  { icon: FiCheckCircle, label: 'Delivered',  color: '#2d8659' },
   completed:  { icon: FiCheckCircle, label: 'Completed',  color: '#2d8659' },
   cancelled:  { icon: FiXCircle,     label: 'Cancelled',  color: '#c0392b' },
+  returned:   { icon: FiRotateCcw,   label: 'Returned',   color: '#8A4B08' },
   refunded:   { icon: FiXCircle,     label: 'Refunded',   color: '#c0392b' },
 }
 
@@ -29,6 +30,7 @@ const statusMessages = {
   delivered:  "Your handcrafted piece has arrived. We hope you love it!",
   completed:  "Thank you for being part of our handcrafted journey.",
   cancelled:  "This order was cancelled.",
+  returned:   "This order was returned. A refund will be processed shortly.",
   refunded:   "A refund has been processed for this order.",
 }
 
@@ -68,12 +70,17 @@ const detectCarrier = (trackingNumber) => {
 
 // ── Progress Stepper ──
 const OrderProgressStepper = ({ order }) => {
-  if (['cancelled', 'refunded'].includes(order.status)) {
+  if (['cancelled', 'returned', 'refunded'].includes(order.status)) {
+    const labels = {
+      cancelled: 'Order Cancelled',
+      returned: 'Order Returned',
+      refunded: 'Order Refunded',
+    }
     return (
       <div className="ord-stepper ord-stepper--cancelled">
         <div className="ord-stepper__cancelled-indicator">
-          <FiXCircle />
-          <span>{order.status === 'cancelled' ? 'Order Cancelled' : 'Order Refunded'}</span>
+          {order.status === 'returned' ? <FiRotateCcw /> : <FiXCircle />}
+          <span>{labels[order.status]}</span>
         </div>
       </div>
     )

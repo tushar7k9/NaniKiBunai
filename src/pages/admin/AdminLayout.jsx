@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Outlet, NavLink, Link, useLocation } from 'react-router-dom'
-import { FiGrid, FiShoppingBag, FiPackage, FiStar, FiMessageSquare, FiArrowLeft, FiMenu, FiX } from 'react-icons/fi'
+import { FiGrid, FiShoppingBag, FiPackage, FiStar, FiMessageSquare, FiArrowLeft, FiMenu, FiX, FiUsers, FiBarChart2 } from 'react-icons/fi'
 import { useAuth } from '../../hooks/useAuth'
 import * as adminService from '../../services/adminService'
 import './AdminLayout.css'
@@ -17,8 +17,10 @@ const AdminLayout = () => {
 
   const navItems = [
     { to: '/admin', icon: <FiGrid />, label: 'Dashboard', end: true },
+    { to: '/admin/analytics', icon: <FiBarChart2 />, label: 'Analytics' },
     { to: '/admin/orders', icon: <FiShoppingBag />, label: 'Orders' },
     { to: '/admin/products', icon: <FiPackage />, label: 'Products' },
+    { to: '/admin/users', icon: <FiUsers />, label: 'Users' },
     { to: '/admin/reviews', icon: <FiStar />, label: 'Reviews' },
     { to: '/admin/messages', icon: <FiMessageSquare />, label: 'Messages', badge: unreadCount },
   ]

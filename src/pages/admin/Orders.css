@@ -449,4 +449,30 @@
   .adm-orders__detail-grid {
     grid-template-columns: 1fr;
   }
+
+  /* Filters: search takes the full row */
+  .adm-orders__search-form {
+    width: 100%;
+    display: flex;
+    gap: 8px;
+  }
+
+  .adm-orders__search-wrap {
+    flex: 1;
+  }
+
+  .adm-orders__search-input {
+    width: 100%;
+  }
+
+  .adm-orders__tracking-input {
+    width: 100%;
+  }
+
+  /* Items table inside the expanded card: tighter cells */
+  .adm-orders__items-table th,
+  .adm-orders__items-table td {
+    padding: 6px 8px;
+    font-size: 0.8rem;
+  }
 }

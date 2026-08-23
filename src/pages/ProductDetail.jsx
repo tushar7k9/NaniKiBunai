@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useAnimationControls } from 'framer-motion'
 import { FiHeart, FiShoppingBag, FiChevronLeft, FiChevronRight, FiStar, FiEdit3, FiThumbsUp, FiTruck, FiShield, FiRefreshCw, FiX, FiMaximize2, FiClock } from 'react-icons/fi'
 import { useProducts } from '../hooks/useProducts'
 import { useCart } from '../hooks/useCart'
@@ -226,7 +226,13 @@ const ProductDetail = () => {
   const [customMeasurements, setCustomMeasurements] = useState({})
   const [isSizeChartOpen, setIsSizeChartOpen] = useState(false)
   const mainImageRef = useRef(null)
-  const { fly } = useFlyToCart()
+  const { notifyAdded } = useFlyToCart()
+  const shakeControls = useAnimationControls()
+
+  // Every measurement field for the category is required when Custom is selected
+  const activeCustomFields = customMeasurementFields[product?.category] || customMeasurementFields.accessories
+  const customIncomplete = isCustomSize &&
+    activeCustomFields.some(f => !(customMeasurements[f.key] || '').trim())
 
   // Set default size when product loads
   useEffect(() => {
@@ -311,12 +317,24 @@ const ProductDetail = () => {
   const nextImage = () => setCurrentImageIndex((p) => (p + 1) % product.images.length)
   const prevImage = () => setCurrentImageIndex((p) => p === 0 ? product.images.length - 1 : p - 1)
 
-  const handleAddToCart = () => {
-    // Trigger fly animation
-    if (mainImageRef.current) {
-      const rect = mainImageRef.current.getBoundingClientRect()
-      fly(product.images[currentImageIndex], rect)
+  const handleAddToCart = (e) => {
+    // Custom size selected but measurements missing — shake instead of adding
+    if (customIncomplete) {
+      shakeControls.start({
+        x: [0, -8, 8, -6, 6, -3, 3, 0],
+        transition: { duration: 0.45, ease: 'easeInOut' },
+      })
+      return
     }
+
+    // Added-to-bag feedback: desktop flies from the image, mobile flies
+    // from the tapped button and shows a confirmation toast
+    notifyAdded({
+      imageSrc: product.images[currentImageIndex],
+      name: product.name,
+      imageRect: mainImageRef.current?.getBoundingClientRect(),
+      buttonRect: e?.currentTarget?.getBoundingClientRect(),
+    })
 
     const sizeValue = isCustomSize
       ? `Custom (${Object.entries(customMeasurements).filter(([,v]) => v).map(([k,v]) => {
@@ -582,13 +600,17 @@ const ProductDetail = () => {
             </div>
           )}
 
-          {/* Add to Bag */}
+          {/* Add to Bag — kept clickable when custom measurements are missing
+              so the tap can trigger the shake feedback (a native disabled
+              button swallows the click) */}
           <motion.button
-            className="pd-add-to-bag"
+            className={`pd-add-to-bag${customIncomplete ? ' pd-add-to-bag--disabled' : ''}`}
             onClick={handleAddToCart}
-            whileHover={!isOutOfStock ? { scale: 1.01 } : {}}
-            whileTap={!isOutOfStock ? { scale: 0.99 } : {}}
+            animate={shakeControls}
+            whileHover={!isOutOfStock && !customIncomplete ? { scale: 1.01 } : {}}
+            whileTap={!isOutOfStock && !customIncomplete ? { scale: 0.99 } : {}}
             disabled={isOutOfStock}
+            aria-disabled={isOutOfStock || customIncomplete}
           >
             <FiShoppingBag />
             {isOutOfStock ? 'Out of Stock' : `Add to Bag — ₹${product.price}`}

@@ -20,8 +20,6 @@ export const CartProvider = ({ children }) => {
 
   const { user, isAuthenticated } = useAuth()
   const previousAuthState = useRef(isAuthenticated)
-  console.log("previousAuthState", previousAuthState);
-
   /**
    * Load cart when user authentication changes
    * If user just logged in, sync guest cart first
@@ -37,7 +35,7 @@ export const CartProvider = ({ children }) => {
         // User just logged in - check if there's a guest cart to sync
         const guestCart = cartStorage.get()
         if (guestCart && guestCart.length > 0) {
-          console.log('User just logged in with guest cart - will sync')
+          // Guest cart found - will sync after loadCart
           // Don't call syncGuestCart here, it will be handled after loadCart
         }
         await loadCart()
@@ -98,7 +96,7 @@ export const CartProvider = ({ children }) => {
 
         // If there was a guest cart, merge it now
         if (hasGuestCart) {
-          console.log('Guest cart detected, starting merge...')
+          // Guest cart detected, starting merge
           // Trigger merge in next tick to ensure cart is set
           setTimeout(() => {
             syncGuestCart()
@@ -182,14 +180,11 @@ export const CartProvider = ({ children }) => {
         setCart(prevCart => [...prevCart, newCartItem])
       } else {
         // Guest user - add to localStorage
-        console.log('Adding to localStorage')
-        console.log(cart)
         const existingIndex = cart.findIndex(item =>
           item.id === product.id &&
           item.selected_color === (product.selectedColor || product.selected_color) &&
           item.selected_size === (product.selectedSize || product.selected_size)
         )
-        console.log('existingIndex', existingIndex)
         if (existingIndex !== -1) {
           // Update existing item
           // Always increment by 1, not by product.quantity
@@ -413,8 +408,6 @@ export const CartProvider = ({ children }) => {
         return
       }
 
-      console.log('Syncing guest cart:', guestCart)
-
       // Load current user's cart from Supabase
       const { data: userCartData, error: fetchError } = await supabase
         .from('cart_items')
@@ -436,8 +429,6 @@ export const CartProvider = ({ children }) => {
         cart_item_id: item.id,
       }))
 
-      console.log('Current user cart:', userCart)
-
       // Merge guest cart with user cart
       for (const guestItem of guestCart) {
         // Find if this exact item (product + color + size) already exists in user's cart
@@ -452,8 +443,6 @@ export const CartProvider = ({ children }) => {
           // Item exists - update quantity by combining both
           const combinedQuantity = existingUserItem.quantity + (guestItem.quantity || 1)
 
-          console.log(`Merging: Product ${guestItem.id} - User has ${existingUserItem.quantity}, Guest has ${guestItem.quantity || 1}, Combined: ${combinedQuantity}`)
-
           const { error: updateError } = await supabase
             .from('cart_items')
             .update({ quantity: combinedQuantity })
@@ -464,8 +453,6 @@ export const CartProvider = ({ children }) => {
           }
         } else {
           // Item doesn't exist - add it to user's cart
-          console.log(`Adding new item: Product ${guestItem.id} with quantity ${guestItem.quantity || 1}`)
-
           const { error: insertError } = await supabase
             .from('cart_items')
             .insert({
@@ -489,7 +476,6 @@ export const CartProvider = ({ children }) => {
       // Reload the cart to reflect merged data
       await loadCart()
 
-      console.log('Cart sync completed successfully')
     } catch (err) {
       console.error('Error syncing guest cart:', err)
     }

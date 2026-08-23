@@ -15,7 +15,7 @@ import { supabase } from '../lib/supabase'
 
 export const AuthContext = createContext()
 
-const ADMIN_EMAIL = 'nanikiibunai@gmail.com'
+export const ADMIN_EMAIL = 'nanikiibunai@gmail.com'
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
@@ -28,7 +28,6 @@ export const AuthProvider = ({ children }) => {
     const getSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
-        console.log("session", session);
         setUser(session?.user ?? null)
       } catch (err) {
         console.error('Error getting session:', err.message)
@@ -43,7 +42,6 @@ export const AuthProvider = ({ children }) => {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event)
         setUser(session?.user ?? null)
         setLoading(false)
       }

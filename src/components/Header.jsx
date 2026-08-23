@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { FiShoppingCart, FiMenu, FiX, FiSearch, FiHeart, FiUser, FiLogOut, FiPackage, FiGrid } from 'react-icons/fi'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import MobileMenu from './MobileMenu'
 import './Header.css'
 
 const Header = ({ cartCount, favoritesCount, onCartClick, onFavoritesClick, cartIconRef, onSearchClick }) => {
@@ -71,15 +72,12 @@ const Header = ({ cartCount, favoritesCount, onCartClick, onFavoritesClick, cart
           </motion.h1>
         </div>
 
-        {isMobileMenuOpen && (
-          <div className="mobile-overlay" onClick={() => setIsMobileMenuOpen(false)} />
-        )}
-
-        <nav className={`header-nav ${isMobileMenuOpen ? 'open' : ''}`}>
-          <Link to="/" className={location.pathname === '/' ? 'active' : ''} onClick={() => setIsMobileMenuOpen(false)}>Home</Link>
-          <Link to="/products" className={location.pathname === '/products' ? 'active' : ''} onClick={() => setIsMobileMenuOpen(false)}>Products</Link>
-          {/* <Link to="/our-story" className={location.pathname === '/our-story' ? 'active' : ''} onClick={() => setIsMobileMenuOpen(false)}>Our Story</Link> */}
-          <Link to="/contact" className={location.pathname === '/contact' ? 'active' : ''} onClick={() => setIsMobileMenuOpen(false)}>Contact</Link>
+        {/* Desktop nav — mobile uses the MobileMenu drawer below */}
+        <nav className="header-nav">
+          <Link to="/" className={location.pathname === '/' ? 'active' : ''}>Home</Link>
+          <Link to="/products" className={location.pathname === '/products' ? 'active' : ''}>Products</Link>
+          {/* <Link to="/our-story" className={location.pathname === '/our-story' ? 'active' : ''}>Our Story</Link> */}
+          <Link to="/contact" className={location.pathname === '/contact' ? 'active' : ''}>Contact</Link>
         </nav>
 
         <div className="header-actions">
@@ -234,11 +232,18 @@ const Header = ({ cartCount, favoritesCount, onCartClick, onFavoritesClick, cart
           <button
             className="mobile-menu-btn"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            aria-label="Open menu"
           >
             {isMobileMenuOpen ? <FiX /> : <FiMenu />}
           </button>
         </div>
       </div>
+
+      <MobileMenu
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
+        favoritesCount={favoritesCount}
+      />
     </motion.header>
   )
 }

@@ -304,7 +304,7 @@ export const orderService = {
   /**
    * Update order status
    * @param {string} orderId - Order UUID
-   * @param {string} status - New status (pending, confirmed, processing, shipped, delivered, completed, cancelled, refunded)
+   * @param {string} status - New status (pending, confirmed, processing, shipped, delivered, completed, cancelled, returned, refunded)
    * @returns {Promise<Object>} Success indicator
    */
   updateOrderStatus: async (orderId, status) => {
@@ -317,6 +317,7 @@ export const orderService = {
         'delivered',
         'completed',
         'cancelled',
+        'returned',
         'refunded',
       ]
 

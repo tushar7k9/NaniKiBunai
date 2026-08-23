@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS orders (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   order_number TEXT UNIQUE NOT NULL,
   user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'processing', 'shipped', 'delivered', 'completed', 'cancelled', 'refunded')),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'processing', 'shipped', 'delivered', 'completed', 'cancelled', 'refunded', 'returned')),
   subtotal NUMERIC(10, 2) NOT NULL DEFAULT 0,
   shipping_cost NUMERIC(10, 2) DEFAULT 0,
   tax_amount NUMERIC(10, 2) DEFAULT 0,
@@ -66,6 +66,9 @@ CREATE TABLE IF NOT EXISTS orders (
   admin_notes TEXT,
   shipped_at TIMESTAMPTZ,
   delivered_at TIMESTAMPTZ,
+  cancelled_at TIMESTAMPTZ,
+  returned_at TIMESTAMPTZ,
+  refunded_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -391,3 +394,38 @@ BEGIN
   RETURN new_count;
 END;
 $$;
+
+-- ============================================
+-- MIGRATION 2026-08: 'returned' status, disruption timestamps,
+-- admin RLS for cart/favorites (Users + Analytics admin views).
+-- The base definitions above already include these changes for
+-- fresh installs — run ONLY this section in the SQL Editor to
+-- upgrade an existing database. Idempotent: safe to re-run.
+-- ============================================
+
+-- 1. Allow 'returned' order status
+--    (inline CHECK constraints get the auto-generated name orders_status_check;
+--     verify with: SELECT conname FROM pg_constraint
+--                  WHERE conrelid = 'orders'::regclass AND contype = 'c';)
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
+ALTER TABLE orders ADD CONSTRAINT orders_status_check
+  CHECK (status IN ('pending', 'confirmed', 'processing', 'shipped', 'delivered',
+                    'completed', 'cancelled', 'refunded', 'returned'));
+
+-- 2. Disruption timestamps (set from the app on status transitions,
+--    like shipped_at/delivered_at; used by Analytics time-series)
+ALTER TABLE orders
+  ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS returned_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMPTZ;
+
+-- 3. Admin read access to carts and favorites (user drill-down view)
+DROP POLICY IF EXISTS "Admin can read all cart items" ON cart_items;
+CREATE POLICY "Admin can read all cart items"
+  ON cart_items FOR SELECT
+  USING ((auth.jwt() ->> 'email') = 'nanikiibunai@gmail.com');
+
+DROP POLICY IF EXISTS "Admin can read all favorites" ON favorites;
+CREATE POLICY "Admin can read all favorites"
+  ON favorites FOR SELECT
+  USING ((auth.jwt() ->> 'email') = 'nanikiibunai@gmail.com');

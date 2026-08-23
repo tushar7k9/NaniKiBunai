@@ -771,7 +771,7 @@ const AdminProducts = () => {
               {filtered.map((product) => (
                 <tr key={product.id}>
                   {/* Thumbnail + Name */}
-                  <td>
+                  <td data-cell="title">
                     <div className="adm-products__name-cell">
                       {product.images?.[0] ? (
                         <img
@@ -788,34 +788,34 @@ const AdminProducts = () => {
                   </td>
 
                   {/* Category */}
-                  <td className="adm-products__category">
+                  <td className="adm-products__category" data-label="Category">
                     {product.category.charAt(0).toUpperCase() + product.category.slice(1)}
                   </td>
 
                   {/* Price */}
-                  <td className="adm-products__price">{formatPrice(product.price)}</td>
+                  <td className="adm-products__price" data-label="Price">{formatPrice(product.price)}</td>
 
                   {/* Sizes count */}
-                  <td className="adm-products__sizes">
+                  <td className="adm-products__sizes" data-label="Sizes">
                     {product.sizes?.length ?? 0} sizes
                   </td>
 
                   {/* Rating */}
-                  <td className="adm-products__rating">
+                  <td className="adm-products__rating" data-label="Rating">
                     {product.average_rating
                       ? `${Number(product.average_rating).toFixed(1)} (${product.review_count || 0})`
                       : <span style={{ color: 'var(--text-muted)' }}>—</span>}
                   </td>
 
                   {/* Status badge */}
-                  <td>
+                  <td data-label="Status">
                     <span className={`adm-badge adm-badge--${product.is_active ? 'active' : 'inactive'}`}>
                       {product.is_active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
 
                   {/* Actions */}
-                  <td>
+                  <td data-cell="actions">
                     <div className="adm-products__actions">
                       <button
                         className="adm-btn adm-btn--secondary adm-btn--sm"
