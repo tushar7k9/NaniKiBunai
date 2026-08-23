@@ -1253,3 +1253,71 @@ a.ord-tracking__number svg {
   .ord-return-steps__step { min-width: 48px; }
   .ord-return-dialog__types { grid-template-columns: 1fr; }
 }
+
+/* Return action row: button with its hint neatly under it, right-aligned
+   on desktop, full-width and centered on phones */
+.ord-details__section--return {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  border-top: 1px dashed var(--border-subtle);
+  padding-top: 16px;
+}
+
+.ord-details__section--return .ord-return-window-hint {
+  margin-top: 0;
+  text-align: right;
+}
+
+@media (max-width: 480px) {
+  .ord-details__section--return { align-items: stretch; }
+  .ord-details__section--return .ord-return-btn { justify-content: center; }
+  .ord-details__section--return .ord-return-window-hint { text-align: center; }
+}
+
+/* Rejected request details */
+.ord-return-card__meta {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  color: var(--text-light, #7A6E63);
+}
+
+.ord-return-card__photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ord-return-card__photos img {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 8px;
+  cursor: zoom-in;
+  transition: width 0.2s, height 0.2s;
+}
+
+.ord-return-card__photos img.zoomed {
+  width: 100%;
+  height: auto;
+  cursor: zoom-out;
+}
+
+.ord-return-card__verdict {
+  margin-top: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: rgba(192, 57, 43, 0.06);
+  border: 1px solid rgba(192, 57, 43, 0.16);
+  font-size: 0.8rem;
+  color: #8C2F23;
+  line-height: 1.5;
+}
+
+.ord-return-card__final {
+  margin: 8px 0 0;
+  font-size: 0.74rem;
+  color: var(--text-muted, #9A8C82);
+}

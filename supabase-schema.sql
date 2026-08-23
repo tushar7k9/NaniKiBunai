@@ -1439,3 +1439,99 @@ BEGIN
   RETURN QUERY SELECT * FROM orders WHERE id = v_new_id;
 END;
 $$;
+
+
+-- ============================================================
+-- MIGRATION 2026-08-23i: one return chance per item.
+-- Run this in the Supabase SQL Editor (safe to re-run).
+--
+-- Each order item gets exactly ONE return/replacement request — a
+-- rejected request also consumes that chance (no retries).
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION request_return(
+  p_order_id UUID,
+  p_type TEXT,
+  p_reason TEXT,
+  p_description TEXT,
+  p_photos TEXT[],
+  p_items JSONB
+)
+RETURNS SETOF return_requests
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_order orders%ROWTYPE;
+  v_item RECORD;
+  v_req JSONB;
+  v_enriched JSONB := '[]'::jsonb;
+  v_refund NUMERIC(10, 2) := 0;
+BEGIN
+  SELECT * INTO v_order FROM orders
+  WHERE id = p_order_id
+    AND (
+      user_id = auth.uid()
+      OR (user_id IS NULL AND lower(customer_email) = lower(auth.jwt() ->> 'email'))
+    );
+  IF NOT FOUND THEN RAISE EXCEPTION 'RETURN_ORDER_NOT_FOUND'; END IF;
+
+  IF v_order.replacement_for IS NOT NULL THEN RAISE EXCEPTION 'RETURN_NOT_ELIGIBLE_REPLACEMENT'; END IF;
+  IF v_order.status NOT IN ('delivered', 'completed') THEN RAISE EXCEPTION 'RETURN_NOT_DELIVERED'; END IF;
+  IF v_order.payment_status <> 'paid' THEN RAISE EXCEPTION 'RETURN_NOT_PAID'; END IF;
+  IF v_order.delivered_at IS NULL OR now() > v_order.delivered_at + interval '7 days' THEN
+    RAISE EXCEPTION 'RETURN_WINDOW_EXPIRED';
+  END IF;
+  IF p_type NOT IN ('refund', 'replacement') OR p_reason NOT IN ('size', 'color', 'damaged', 'not_as_described', 'other') THEN
+    RAISE EXCEPTION 'RETURN_INVALID_INPUT';
+  END IF;
+  IF coalesce(array_length(p_photos, 1), 0) < 1 OR array_length(p_photos, 1) > 4 THEN
+    RAISE EXCEPTION 'RETURN_PHOTOS_REQUIRED';
+  END IF;
+  IF p_items IS NULL OR jsonb_typeof(p_items) <> 'array' OR jsonb_array_length(p_items) < 1 THEN
+    RAISE EXCEPTION 'RETURN_NO_ITEMS';
+  END IF;
+
+  FOR v_req IN SELECT * FROM jsonb_array_elements(p_items) LOOP
+    SELECT * INTO v_item FROM order_items
+    WHERE id = (v_req ->> 'order_item_id')::int AND order_id = p_order_id;
+    IF NOT FOUND THEN RAISE EXCEPTION 'RETURN_ITEM_NOT_IN_ORDER'; END IF;
+
+    IF v_item.selected_size = 'Custom'
+       OR (v_item.product_snapshot ->> 'customer_instructions') IS NOT NULL THEN
+      RAISE EXCEPTION 'RETURN_ITEM_CUSTOM';
+    END IF;
+
+    -- ONE chance per item: any prior request (even a rejected one) blocks
+    IF EXISTS (
+      SELECT 1 FROM return_requests rr
+      WHERE rr.order_id = p_order_id
+        AND rr.items @> jsonb_build_array(jsonb_build_object('order_item_id', v_item.id))
+    ) THEN
+      RAISE EXCEPTION 'RETURN_ITEM_ALREADY_REQUESTED';
+    END IF;
+
+    v_refund := v_refund + v_item.total_price;
+    v_enriched := v_enriched || jsonb_build_array(jsonb_build_object(
+      'order_item_id', v_item.id,
+      'name', coalesce(v_item.product_snapshot ->> 'name', 'Item'),
+      'quantity', v_item.quantity,
+      'total_price', v_item.total_price,
+      'selected_size', v_item.selected_size,
+      'selected_color', v_item.selected_color,
+      'replacement_size', v_req ->> 'replacement_size',
+      'replacement_color', v_req ->> 'replacement_color'
+    ));
+  END LOOP;
+
+  RETURN QUERY
+  INSERT INTO return_requests
+    (order_id, user_id, type, reason, description, photos, items, refund_amount)
+  VALUES
+    (p_order_id, auth.uid(), p_type, p_reason,
+     nullif(left(trim(coalesce(p_description, '')), 1000), ''),
+     p_photos, v_enriched, v_refund)
+  RETURNING *;
+END;
+$$;
