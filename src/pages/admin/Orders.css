@@ -512,10 +512,33 @@
 .adm-orders__quick-cell {
   text-align: right;
   white-space: nowrap;
+  width: 1%; /* shrink-to-fit so the button hugs the chevron */
 }
 
+/* Branded quick-action pill — reads as an action, not a form control */
 .adm-orders__quick-btn {
-  min-width: 86px;
+  min-width: 92px;
+  padding: 7px 14px;
+  border: 1.5px solid var(--terracotta-light);
+  border-radius: 100px;
+  background: rgba(196, 137, 106, 0.07);
+  color: var(--terracotta-dark);
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.adm-orders__quick-btn:hover:not(:disabled) {
+  background: var(--terracotta);
+  border-color: var(--terracotta);
+  color: white;
+}
+
+.adm-orders__quick-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 
 /* ── Detail: status action buttons + copy buttons ── */
@@ -600,5 +623,52 @@
   .adm-orders__items-table td {
     padding: 6px 8px;
     font-size: 0.8rem;
+  }
+
+  /* Card mode fixes */
+
+  /* Full email — the 120px tablet cap would clip it brutally */
+  .adm-orders__email {
+    max-width: none;
+    min-width: 0;
+    text-align: right;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  /* Age sits inline next to the date, not stranded across the row */
+  .adm-orders__age {
+    display: inline;
+    margin: 0 0 0 8px;
+  }
+
+  /* Stale highlight belongs on the whole card, not just the title cell */
+  .adm-orders__row--stale {
+    box-shadow: inset 3px 0 0 #D4AF37;
+  }
+
+  .adm-orders__row--stale td:first-child {
+    box-shadow: none;
+  }
+
+  /* Quick action becomes a comfortable full-width tap target */
+  .adm-orders__quick-cell {
+    width: auto;
+    white-space: normal;
+  }
+
+  .adm-orders__quick-btn {
+    width: 100%;
+    padding: 10px 14px;
+  }
+
+  /* The desktop expanded-row cell tint paints "selected text" stripes in
+     card mode (cells are full-width blocks) — tint the whole card instead */
+  .adm-orders__table tbody tr.adm-orders__row--expanded td {
+    background: transparent;
+  }
+
+  .adm-orders__table tbody tr.adm-orders__row--expanded {
+    background: #FCF7F2;
   }
 }

@@ -716,17 +716,20 @@
     overflow: visible;
   }
 
+  /* Child combinators throughout: card mode must apply ONLY to the outer
+     table's own rows — nested tables inside expanded detail rows (e.g. the
+     order items table) keep their normal table layout */
   .adm-table,
-  .adm-table tbody {
+  .adm-table > tbody {
     display: block;
     width: 100%;
   }
 
-  .adm-table thead {
+  .adm-table > thead {
     display: none;
   }
 
-  .adm-table tr {
+  .adm-table > tbody > tr {
     display: block;
     position: relative;
     background: white;
@@ -736,25 +739,25 @@
     margin-bottom: 10px;
   }
 
-  .adm-table tr:hover td {
+  .adm-table > tbody > tr:hover td {
     background: transparent;
   }
 
-  .adm-table td {
+  .adm-table > tbody > tr > td {
     display: block;
     width: 100%;
     padding: 3px 0;
     border-bottom: none;
   }
 
-  .adm-table td[data-label] {
+  .adm-table > tbody > tr > td[data-label] {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
   }
 
-  .adm-table td[data-label]::before {
+  .adm-table > tbody > tr > td[data-label]::before {
     content: attr(data-label);
     font-size: 0.68rem;
     font-weight: 600;
@@ -764,14 +767,14 @@
     flex-shrink: 0;
   }
 
-  .adm-table td[data-cell="title"] {
+  .adm-table > tbody > tr > td[data-cell="title"] {
     font-weight: 600;
     font-size: 0.95rem;
     padding-right: 32px;
     padding-bottom: 8px;
   }
 
-  .adm-table td[data-cell="expand"] {
+  .adm-table > tbody > tr > td[data-cell="expand"] {
     position: absolute;
     top: 14px;
     right: 14px;
@@ -780,7 +783,7 @@
     color: var(--text-muted);
   }
 
-  .adm-table td[data-cell="actions"] {
+  .adm-table > tbody > tr > td[data-cell="actions"] {
     display: flex;
     justify-content: flex-end;
     gap: 8px;
@@ -790,7 +793,7 @@
   }
 
   /* Expanded detail rows (colSpan cells with their own inner layout) */
-  .adm-table tr[data-row="detail"] {
+  .adm-table > tbody > tr[data-row="detail"] {
     padding: 0;
     overflow: hidden;
     margin-top: -12px; /* visually attach to the card above */
@@ -798,7 +801,7 @@
     border-top-right-radius: 0;
   }
 
-  .adm-table tr[data-row="detail"] > td {
+  .adm-table > tbody > tr[data-row="detail"] > td {
     padding: 0;
   }
 
