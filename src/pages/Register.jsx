@@ -232,6 +232,12 @@ function Register() {
               />
             </div>
 
+            <p className="auth-consent">
+              By creating an account, you agree to our{' '}
+              <Link to="/terms">Terms &amp; Conditions</Link> and{' '}
+              <Link to="/privacy">Privacy Policy</Link>.
+            </p>
+
             <button
               type="submit"
               className="auth-button"

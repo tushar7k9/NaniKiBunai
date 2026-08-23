@@ -396,6 +396,11 @@ const Checkout = () => {
                   >
                     {isProcessing ? 'Processing...' : `Place Order — ₹${total.toFixed(0)}`}
                   </motion.button>
+                  <p className="co-consent">
+                    By placing this order, you agree to our{' '}
+                    <Link to="/terms">Terms &amp; Conditions</Link> and{' '}
+                    <Link to="/shipping-returns">Shipping &amp; Returns policy</Link>.
+                  </p>
                 </div>
               </motion.div>
             )}
