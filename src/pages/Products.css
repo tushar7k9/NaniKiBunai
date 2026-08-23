@@ -242,15 +242,26 @@
 /* Fixed full-viewport curtain: always visible regardless of scroll
    position, and covers the grid swap + scroll jump happening beneath it */
 .category-reveal {
-  position: fixed;
+  position: absolute;
   inset: 0;
-  z-index: 1250;
+  z-index: 40; /* above the cards, below the fixed header and sticky filter bar */
+  overflow: hidden;
+  border-radius: 18px;
+  pointer-events: none;
+}
+
+/* Positioned over the visible slice of the grid — top/height are set
+   inline at mount (viewport ∩ grid); the defaults below are the fallback */
+.category-reveal__panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
-  pointer-events: none;
 }
 
 .category-reveal__bg {
@@ -304,6 +315,8 @@
   margin: 0 auto;
   padding: 40px 24px 80px;
   position: relative;
+  /* room for the category reveal even when a category has few products */
+  min-height: 380px;
 }
 
 .products-grid {
