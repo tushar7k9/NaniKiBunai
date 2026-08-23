@@ -38,7 +38,7 @@ export const getStats = async () => {
 export const getAllOrders = async ({ status, search, page = 1, limit = 20 } = {}) => {
   let query = supabase
     .from('orders')
-    .select('*, order_items(*, products(name, images))', { count: 'exact' })
+    .select('*, order_items(*, products(name, images)), return_requests!return_requests_order_id_fkey(*)', { count: 'exact' })
     .order('created_at', { ascending: false })
     .range((page - 1) * limit, page * limit - 1)
 
@@ -134,6 +134,32 @@ export const updateOrderStatus = async (orderId, status, { fromStatus, trackingN
 
   if (error) throw error
   return data
+}
+
+// ── Returns & replacements ──
+
+/** Move a return request through its lifecycle (approve/reject/receive/complete). */
+export const updateReturnStatus = async (requestId, status, { rejectionReason } = {}) => {
+  const updates = { status, updated_at: new Date().toISOString() }
+  if (status === 'rejected') updates.rejection_reason = (rejectionReason || '').trim().slice(0, 300)
+  const { data, error } = await supabase
+    .from('return_requests')
+    .update(updates)
+    .eq('id', requestId)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+/** Create the linked ₹0 replacement order (atomic, server-side). */
+export const createReplacementOrder = async (requestId) => {
+  const { data, error } = await supabase.rpc('create_replacement_order', {
+    p_request_id: requestId,
+  })
+  if (error) throw error
+  return Array.isArray(data) ? data[0] : data
 }
 
 /** Mark an order's payment collected/refunded (COD flow). */

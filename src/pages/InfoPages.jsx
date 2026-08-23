@@ -347,9 +347,15 @@ export const ShippingReturnsPage = () => (
           items are delicate — please try them on gently.
         </li>
         <li>
-          To start a return, email{' '}
+          To start a return or request a replacement (e.g. a different size or
+          color), open <Link to="/orders">My Orders</Link>, expand the delivered
+          order, and tap <strong>Return or Replace</strong>. You'll add a couple
+          of photos of the item and we'll arrange a pickup.
+        </li>
+        <li>
+          Prefer email? Write to{' '}
           <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> with your order
-          number. We'll arrange pickup or share the return address.
+          number and we'll help.
         </li>
         <li>Exchanges (for size or colour) are offered subject to availability.</li>
       </ul>
@@ -423,6 +429,13 @@ export const HelpPage = () => (
         <dd>
           Cash on Delivery — pay the order total in cash when your piece arrives.
           No advance payment needed.
+        </dd>
+        <dt>How do I return or replace an item?</dt>
+        <dd>
+          Within 7 days of delivery, open <Link to="/orders">My Orders</Link>,
+          expand the order, and tap Return or Replace. Choose a refund or a
+          different size/color, add photos of the item, and we'll arrange a
+          pickup. Custom-sized pieces can't be returned.
         </dd>
         <dt>Do I need an account to order?</dt>
         <dd>
