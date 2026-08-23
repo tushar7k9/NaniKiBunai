@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS products (
   review_count INTEGER DEFAULT 0,
   difficulty TEXT CHECK (difficulty IN ('beginner', 'intermediate', 'advanced')),
   is_active BOOLEAN DEFAULT true,
+  stock_quantity INTEGER, -- NULL = stock not tracked (unlimited)
+  low_stock_threshold INTEGER DEFAULT 10,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -490,3 +492,10 @@ CREATE POLICY "Users can view their own order items"
       )
     )
   );
+
+-- Stock columns the app already reads (Sold Out badges, quantity caps,
+-- low-stock warnings) but which never existed in the live database —
+-- every stock feature was silently dormant. NULL = stock not tracked.
+ALTER TABLE products
+  ADD COLUMN IF NOT EXISTS stock_quantity INTEGER,
+  ADD COLUMN IF NOT EXISTS low_stock_threshold INTEGER DEFAULT 10;
