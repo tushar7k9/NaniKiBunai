@@ -826,14 +826,16 @@ const AdminProducts = () => {
                       </button>
 
                       <button
-                        className={`adm-btn adm-btn--sm ${product.is_active ? 'adm-btn--secondary' : 'adm-btn--success'}`}
-                        title={product.is_active ? 'Deactivate' : 'Activate'}
+                        className={`adm-btn adm-btn--sm ${product.is_active ? 'adm-btn--success' : 'adm-btn--secondary'}`}
+                        title={product.is_active ? 'Visible in store — click to deactivate' : 'Hidden from store — click to activate'}
                         onClick={() => handleToggleActive(product)}
                         disabled={togglingId === product.id}
                       >
+                        {/* Icon shows the CURRENT state (eye = live in store),
+                            not the action — reads more intuitively */}
                         {togglingId === product.id
                           ? <span className="adm-products__mini-spinner" />
-                          : product.is_active ? <FiEyeOff /> : <FiEye />}
+                          : product.is_active ? <FiEye /> : <FiEyeOff />}
                       </button>
 
                       <button

@@ -122,3 +122,31 @@
   text-underline-offset: 2px;
   flex-shrink: 0;
 }
+
+/* ── Public orders-paused ribbon ── */
+.orders-paused-ribbon {
+  position: fixed;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1050; /* under drawers (1100+) and the added-to-bag toast */
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: #FFF8E6;
+  border: 1px solid #F0DFAE;
+  color: #7A5C0B;
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.45;
+  padding: 10px 18px;
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg);
+  max-width: min(92vw, 560px);
+  text-align: center;
+}
+
+.orders-paused-ribbon svg {
+  flex-shrink: 0;
+  font-size: 1rem;
+}

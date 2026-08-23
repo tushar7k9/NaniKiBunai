@@ -74,11 +74,11 @@ const Footer = () => {
           >
             <h4>Customer Care</h4>
             <ul>
-              <li><a href="#shipping">Shipping Info</a></li>
-              <li><a href="#returns">Returns & Exchange</a></li>
-              <li><a href="#sizing">Size Guide</a></li>
-              <li><a href="#care">Care Instructions</a></li>
-              <li><a href="#faq">FAQ</a></li>
+              <li><Link to="/shipping-returns">Shipping Info</Link></li>
+              <li><Link to="/shipping-returns">Returns & Exchange</Link></li>
+              <li><Link to="/help">Size Guide</Link></li>
+              <li><Link to="/help">Care Instructions</Link></li>
+              <li><Link to="/help">FAQ</Link></li>
             </ul>
           </motion.div>
 
@@ -101,7 +101,7 @@ const Footer = () => {
               </div>
               <div className="contact-item">
                 <FiMapPin />
-                <span>Jaipur, Rajasthan, India</span>
+                <span>Gurugram, Haryana, India</span>
               </div>
             </div>
             <div className="newsletter">
@@ -128,8 +128,8 @@ const Footer = () => {
         >
           <p>&copy; 2025 Nani ki Bunai. All rights reserved. Handcrafted with love.</p>
           <div className="footer-links">
-            <a href="#privacy">Privacy Policy</a>
-            <a href="#terms">Terms of Service</a>
+            <Link to="/privacy">Privacy Policy</Link>
+            <Link to="/terms">Terms & Conditions</Link>
           </div>
         </motion.div>
       </div>

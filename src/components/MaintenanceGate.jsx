@@ -1,10 +1,31 @@
 import React from 'react'
 import { useLocation, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { FiTool, FiMail } from 'react-icons/fi'
+import { FiTool, FiMail, FiPauseCircle } from 'react-icons/fi'
 import { useAuth } from '../hooks/useAuth'
 import { useStoreSettings } from '../hooks/useStoreSettings'
 import './MaintenanceGate.css'
+
+/**
+ * Public ribbon shown to every visitor while ordering is paused, so nobody
+ * discovers it only at the cart. Hidden during maintenance (the curtain or
+ * the admin's maintenance ribbon takes over there).
+ */
+export const OrdersPausedRibbon = () => {
+  const { settings } = useStoreSettings()
+  if (!settings.orders_paused || settings.maintenance_mode) return null
+
+  const message =
+    settings.orders_paused_message?.trim() ||
+    "We're not taking new orders right now — browsing is open, ordering resumes soon!"
+
+  return (
+    <div className="orders-paused-ribbon" role="status">
+      <FiPauseCircle />
+      <span>{message}</span>
+    </div>
+  )
+}
 
 // The admin must always be able to sign in to turn maintenance off —
 // AdminRoute redirects a signed-out admin to /login, so gating these

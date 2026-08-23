@@ -445,6 +445,29 @@
   flex-shrink: 0;
 }
 
+/* Informational notice (e.g. orders paused) — calm amber, not an error */
+.cart-footer__notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  text-align: left;
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.55;
+  color: #7A5C0B;
+  background: #FFF8E6;
+  border: 1px solid #F0DFAE;
+  padding: 11px 14px;
+  border-radius: 10px;
+  margin-bottom: 16px;
+}
+
+.cart-footer__notice svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  font-size: 0.95rem;
+}
+
 .cart-footer__row {
   display: flex;
   justify-content: space-between;
