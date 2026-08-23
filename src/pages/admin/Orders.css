@@ -429,6 +429,8 @@
   overflow-x: auto;
   scrollbar-width: none;
   padding-bottom: 2px;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .adm-orders__tabs::-webkit-scrollbar {
