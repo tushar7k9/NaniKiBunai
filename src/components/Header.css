@@ -5,17 +5,35 @@
   left: 0;
   right: 0;
   z-index: 1000;
-  background: rgba(250, 249, 246, 0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  transition: all 0.35s var(--ease-out-expo);
+  transition: padding 0.35s var(--ease-out-expo);
   padding: 18px 0;
+}
+
+/* Progressive gradient blur: the tint and the backdrop blur both dissolve
+   below the bar instead of ending in a border or shadow line */
+.header::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 -36px 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    rgba(250, 249, 246, 0.97) 0%,
+    rgba(250, 249, 246, 0.94) 60%,
+    rgba(250, 249, 246, 0.6) 82%,
+    rgba(250, 249, 246, 0) 100%
+  );
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  /* blur stays strong deeper than the tint so the dissolve zone reads
+     as frosted rather than semi-clear */
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 72%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 72%, transparent 100%);
 }
 
 .header.scrolled {
   padding: 10px 0;
-  box-shadow: 0 1px 12px rgba(92, 64, 51, 0.08);
-  background: rgba(250, 249, 246, 0.97);
 }
 
 .header-container {

@@ -70,19 +70,10 @@
 }
 
 /* ── Filter Bar ── */
+/* Scrolls away with the page — intentionally not sticky */
 .products-filter-bar {
-  position: sticky;
-  top: calc(72px + var(--banner-h, 0px));
-  z-index: 20;
   background: rgba(250, 249, 246, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border-subtle);
-  transition: box-shadow 0.3s ease;
-}
-
-.products-filter-bar.sticky {
-  box-shadow: 0 2px 20px rgba(92, 64, 51, 0.06);
 }
 
 .products-filter-bar__inner {
@@ -819,7 +810,4 @@
     max-width: 240px;
   }
 
-  .products-filter-bar {
-    top: 60px;
-  }
 }

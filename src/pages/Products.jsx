@@ -329,7 +329,6 @@ const Products = () => {
   const [isSortOpen, setIsSortOpen] = useState(false)
   const sortRef = useRef(null)
   const filterBarRef = useRef(null)
-  const [isFilterSticky, setIsFilterSticky] = useState(false)
 
   // Transition state: 'idle' | 'revealing' | 'entering'
   const [transitionState, setTransitionState] = useState('idle')
@@ -378,18 +377,6 @@ const Products = () => {
   useEffect(() => {
     isFirstRender.current = false
     return () => clearTimeout(revealTimerRef.current)
-  }, [])
-
-  // Sticky filter bar detection
-  useEffect(() => {
-    const handleScroll = () => {
-      if (filterBarRef.current) {
-        const rect = filterBarRef.current.getBoundingClientRect()
-        setIsFilterSticky(rect.top <= 72)
-      }
-    }
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
   // Close sort dropdown on outside click
@@ -511,7 +498,7 @@ const Products = () => {
       {/* ── Filter Bar ── */}
       <motion.div
         ref={filterBarRef}
-        className={`products-filter-bar${isFilterSticky ? ' sticky' : ''}`}
+        className="products-filter-bar"
         initial={{ y: -10, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.3, duration: 0.4 }}
