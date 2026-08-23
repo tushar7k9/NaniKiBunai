@@ -243,6 +243,21 @@
 }
 
 /* Auth Button */
+/* Consent line above the submit button */
+.auth-consent {
+  margin: 0 0 14px;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.auth-consent a {
+  color: var(--terracotta-dark);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .auth-button {
   width: 100%;
   padding: 16px;
