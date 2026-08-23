@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useMemo, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion'
 import { FiHeart, FiShoppingBag, FiChevronDown, FiCheck, FiStar } from 'react-icons/fi'
@@ -36,12 +36,37 @@ const storyMoments = [
 /* ─── Category Reveal Transition ───
    Fixed full-viewport curtain, independent of the grid swap underneath.
    It mounts the instant a filter is tapped (no waiting on the grid's exit)
-   and is always in view no matter how far the user has scrolled — the two
-   things that made the old in-flow version flaky. All inner steps finish
-   by ~650ms, comfortably inside the 700ms window before it exits. */
+   and covers only the product grid area. The inner panel is sticky so the
+   text stays in the visible part of the grid even when a filter is tapped
+   from the sticky bar after scrolling deep. All inner steps finish by
+   ~650ms, comfortably inside the 700ms window before it exits. */
 const CategoryReveal = ({ categoryName }) => {
+  const overlayRef = useRef(null)
+  const [panelStyle, setPanelStyle] = useState(null)
+
+  // Center the text in the slice of the grid that is actually on screen
+  // (viewport ∩ grid, below the header/sticky filter bar). Computed once at
+  // mount — nothing scrolls during the reveal's 700ms lifetime.
+  useLayoutEffect(() => {
+    const wrap = overlayRef.current?.parentElement
+    if (!wrap) return
+    const rect = wrap.getBoundingClientRect()
+    const VH = window.innerHeight
+    const TOP_OFFSET = 130 // fixed header + sticky filter bar
+    const MIN_STAGE = 220
+    let sliceTop = Math.max(rect.top, TOP_OFFSET)
+    let sliceBottom = Math.min(VH, rect.bottom)
+    // Guarantee a minimum stage, pulled back inside the grid if needed
+    if (sliceBottom - sliceTop < MIN_STAGE) {
+      sliceTop = Math.max(rect.top, Math.min(sliceTop, rect.bottom - MIN_STAGE))
+      sliceBottom = sliceTop + MIN_STAGE
+    }
+    setPanelStyle({ top: sliceTop - rect.top, height: sliceBottom - sliceTop })
+  }, [])
+
   return (
     <motion.div
+      ref={overlayRef}
       className="category-reveal"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -56,33 +81,35 @@ const CategoryReveal = ({ categoryName }) => {
         transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
       />
 
-      {/* Category name */}
-      <motion.h2
-        className="category-reveal__name"
-        initial={{ opacity: 0, y: 20, letterSpacing: '0.15em' }}
-        animate={{ opacity: 1, y: 0, letterSpacing: '0.25em' }}
-        transition={{ delay: 0.1, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-      >
-        {categoryName}
-      </motion.h2>
+      <div className="category-reveal__panel" style={panelStyle || undefined}>
+        {/* Category name */}
+        <motion.h2
+          className="category-reveal__name"
+          initial={{ opacity: 0, y: 20, letterSpacing: '0.15em' }}
+          animate={{ opacity: 1, y: 0, letterSpacing: '0.25em' }}
+          transition={{ delay: 0.1, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+        >
+          {categoryName}
+        </motion.h2>
 
-      {/* Stitch line */}
-      <motion.div
-        className="category-reveal__stitch"
-        initial={{ scaleX: 0 }}
-        animate={{ scaleX: 1 }}
-        transition={{ delay: 0.25, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-      />
+        {/* Stitch line */}
+        <motion.div
+          className="category-reveal__stitch"
+          initial={{ scaleX: 0 }}
+          animate={{ scaleX: 1 }}
+          transition={{ delay: 0.25, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+        />
 
-      {/* Subtitle accent */}
-      <motion.span
-        className="category-reveal__accent"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.4, duration: 0.25 }}
-      >
-        curated for you
-      </motion.span>
+        {/* Subtitle accent */}
+        <motion.span
+          className="category-reveal__accent"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4, duration: 0.25 }}
+        >
+          curated for you
+        </motion.span>
+      </div>
     </motion.div>
   )
 }
@@ -302,7 +329,6 @@ const Products = () => {
   const [isSortOpen, setIsSortOpen] = useState(false)
   const sortRef = useRef(null)
   const filterBarRef = useRef(null)
-  const [isFilterSticky, setIsFilterSticky] = useState(false)
 
   // Transition state: 'idle' | 'revealing' | 'entering'
   const [transitionState, setTransitionState] = useState('idle')
@@ -351,18 +377,6 @@ const Products = () => {
   useEffect(() => {
     isFirstRender.current = false
     return () => clearTimeout(revealTimerRef.current)
-  }, [])
-
-  // Sticky filter bar detection
-  useEffect(() => {
-    const handleScroll = () => {
-      if (filterBarRef.current) {
-        const rect = filterBarRef.current.getBoundingClientRect()
-        setIsFilterSticky(rect.top <= 72)
-      }
-    }
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
   // Close sort dropdown on outside click
@@ -484,7 +498,7 @@ const Products = () => {
       {/* ── Filter Bar ── */}
       <motion.div
         ref={filterBarRef}
-        className={`products-filter-bar${isFilterSticky ? ' sticky' : ''}`}
+        className="products-filter-bar"
         initial={{ y: -10, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.3, duration: 0.4 }}
@@ -565,8 +579,8 @@ const Products = () => {
       {/* ── Product Grid ── */}
       <div className="products-grid-wrap">
 
-        {/* Full-viewport curtain — independent of the grid swap below, so
-            it shows instantly and never gets cut short or scrolled out */}
+        {/* Grid-area curtain — independent of the grid swap below, so it
+            shows instantly and never gets cut short by the exit animation */}
         <AnimatePresence>
           {transitionState === 'revealing' && (
             <CategoryReveal key="reveal" categoryName={revealCategory} />

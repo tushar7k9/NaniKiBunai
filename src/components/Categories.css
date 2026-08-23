@@ -150,23 +150,20 @@
     display: none;
   }
 
+  /* Width tuned so ~2.6 items fit: the third circle is always visibly
+     cut at the right edge, signalling there's more to scroll */
   .category-item {
-    min-width: 110px;
+    min-width: clamp(100px, calc((100vw - 76px) / 2.6), 132px);
     flex-shrink: 0;
     scroll-snap-align: center;
     gap: 10px;
   }
 
   .category-circle {
-    width: 100px;
-    height: 100px;
+    width: clamp(90px, calc((100vw - 76px) / 2.6 - 10px), 120px);
+    height: clamp(90px, calc((100vw - 76px) / 2.6 - 10px), 120px);
     border-width: 3px;
   }
 
   .category-name { font-size: 0.82rem; }
-}
-
-@media (max-width: 380px) {
-  .category-item { min-width: 90px; }
-  .category-circle { width: 85px; height: 85px; }
 }

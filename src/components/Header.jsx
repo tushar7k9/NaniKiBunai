@@ -1,10 +1,182 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { FiShoppingCart, FiMenu, FiX, FiSearch, FiHeart, FiUser, FiLogOut, FiPackage, FiGrid } from 'react-icons/fi'
+import { GiWool } from 'react-icons/gi'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import MobileMenu from './MobileMenu'
 import './Header.css'
+
+const REDUCED_MOTION =
+  typeof window !== 'undefined' &&
+  window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+/* An "i" whose dot is our own element (the stem is a dotless ı), so the
+   brand animation can hide the dots and stamp them back one by one */
+const DottedI = ({ dotRef, visible }) => (
+  <span className="brand-i">
+    ı
+    <span ref={dotRef} className="brand-i__dot" style={{ opacity: visible ? 1 : 0 }} />
+  </span>
+)
+
+/* Timeline of the brand intro, in seconds (relative to animation start).
+   One continuous keyframe animation — no segment handoffs to drop frames. */
+const T = {
+  land: 0.28,       // ball lands on Bunai's i
+  bounce: 0.38,     // little bounce
+  settle: 0.46,
+  hop1: 0.58,       // departs Bunai → stamps its dot
+  apex1: 0.76,
+  ki: 0.94,
+  hop2: 1.06,       // departs ki
+  apex2: 1.24,
+  nani: 1.42,
+  leap: 1.56,       // departs Nani for the icon slot
+  apexL: 1.78,
+  done: 2.0,
+}
+const START_DELAY = 0.55 // let the header finish sliding in
+
+/* Brand logo with the home-page intro: a mini wool ball drops onto the "i"
+   of Bunai, hops right-to-left across ki and Nani (stamping each dot as it
+   departs), then leaps into the icon slot growing into the full mark. */
+const BrandLogo = ({ onClick }) => {
+  const location = useLocation()
+  const isHome = location.pathname === '/'
+
+  // 'static' → normal logo · 'prep' → dots/icon hidden, measuring ·
+  // 'play' → traveller in flight · 'done' → finished (≡ static)
+  const [step, setStep] = useState(() => (isHome && !REDUCED_MOTION ? 'prep' : 'static'))
+  const [pts, setPts] = useState(null)
+  const [stamped, setStamped] = useState({ b: false, k: false, n: false })
+  const timersRef = useRef([])
+
+  const brandRef = useRef(null)
+  const iconRef = useRef(null)
+  const naniRef = useRef(null)
+  const kiRef = useRef(null)
+  const bunaiRef = useRef(null)
+
+  useEffect(() => {
+    if (!isHome || REDUCED_MOTION) {
+      setStep('static')
+      return
+    }
+    let cancelled = false
+    setStep('prep')
+    setStamped({ b: false, k: false, n: false })
+    Promise.resolve(document.fonts?.ready).then(() =>
+      requestAnimationFrame(() => {
+        if (cancelled || !brandRef.current) return
+        const hr = brandRef.current.getBoundingClientRect()
+        const center = (el) => {
+          const r = el.getBoundingClientRect()
+          return { x: r.left - hr.left + r.width / 2, y: r.top - hr.top + r.height / 2 }
+        }
+        const iconSvg = iconRef.current?.querySelector('svg')
+        if (!iconSvg || !bunaiRef.current || !kiRef.current || !naniRef.current) return
+        // The traveller is a mini wool ball — bigger than the i-dots it stamps
+        const tSize = Math.max(12, bunaiRef.current.getBoundingClientRect().width * 2.6)
+        setPts({
+          tSize,
+          hop: hr.height * 0.55,
+          grow: iconSvg.getBoundingClientRect().width / tSize,
+          b: center(bunaiRef.current),
+          k: center(kiRef.current),
+          n: center(naniRef.current),
+          i: center(iconSvg),
+        })
+        setStep('play')
+        // Stamp each dot exactly when the ball departs it; reveal the icon
+        // as the ball lands on it
+        const at = (sec, fn) => timersRef.current.push(setTimeout(fn, (START_DELAY + sec) * 1000))
+        at(T.hop1, () => setStamped((s) => ({ ...s, b: true })))
+        at(T.hop2, () => setStamped((s) => ({ ...s, k: true })))
+        at(T.leap, () => setStamped((s) => ({ ...s, n: true })))
+        at(T.done, () => setStep('done'))
+      })
+    )
+    return () => {
+      cancelled = true
+      timersRef.current.forEach(clearTimeout)
+      timersRef.current = []
+    }
+  }, [isHome, location.key])
+
+  const playing = step === 'play'
+  const dotVisible = (key) => (step === 'static' || step === 'done' ? true : stamped[key])
+  // The traveller lands as the full-size icon, then the real icon takes over
+  const iconShown = step === 'static' || step === 'done'
+
+  // The full journey as one keyframed path: drop, bounce, two hops, leap
+  const seg = React.useMemo(() => {
+    if (!pts) return null
+    const o = pts.tSize / 2
+    const { b, k, n, i, hop, grow } = pts
+    const apex = (p, q, h) => Math.min(p.y, q.y) - h - o
+    const D = T.done
+    return {
+      x: [b.x - o, b.x - o, b.x - o, b.x - o, b.x - o, (b.x + k.x) / 2 - o, k.x - o, k.x - o, (k.x + n.x) / 2 - o, n.x - o, n.x - o, (n.x + i.x) / 2 - o, i.x - o],
+      y: [b.y - o - 34, b.y - o, b.y - o - 9, b.y - o, b.y - o, apex(b, k, hop), k.y - o, k.y - o, apex(k, n, hop), n.y - o, n.y - o, apex(n, i, hop), i.y - o],
+      opacity: [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+      rotate: [-120, 0, 0, 0, 0, -90, -180, -180, -270, -360, -360, -540, -720],
+      scale: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, grow * 0.6, grow],
+      transition: {
+        duration: D,
+        delay: START_DELAY,
+        ease: 'easeInOut',
+        times: [0, T.land, T.bounce, T.settle, T.hop1, T.apex1, T.ki, T.hop2, T.apex2, T.nani, T.leap, T.apexL, T.done].map((t) => t / D),
+      },
+    }
+  }, [pts])
+
+  return (
+    <div className="header-logo" onClick={onClick}>
+      <motion.h1
+        ref={brandRef}
+        aria-label="Nani ki Bunai"
+        whileHover={{ scale: 1.03 }}
+        transition={{ duration: 0.2 }}
+      >
+        <motion.span
+          ref={iconRef}
+          className="logo-yarn"
+          aria-hidden="true"
+          whileHover={{ rotate: 20 }}
+          initial={false}
+          animate={
+            iconShown
+              ? step === 'static'
+                ? { opacity: 1, scale: 1, rotate: 0 }
+                : { opacity: 1, scale: [1.06, 1], rotate: 0, transition: { duration: 0.2 } }
+              : { opacity: 0, scale: 1, rotate: 0, transition: { duration: 0 } }
+          }
+          transition={{ duration: 0.2 }}
+        ><GiWool /></motion.span>
+        {' '}
+        <span aria-hidden="true">Nan<DottedI dotRef={naniRef} visible={dotVisible('n')} /></span>
+        <em aria-hidden="true">k<DottedI dotRef={kiRef} visible={dotVisible('k')} /></em>
+        <span aria-hidden="true">Buna<DottedI dotRef={bunaiRef} visible={dotVisible('b')} /></span>
+        {playing && pts && seg && (
+          <motion.span
+            className="brand-traveler"
+            style={{ width: pts.tSize, height: pts.tSize }}
+            initial={{
+              x: pts.b.x - pts.tSize / 2,
+              y: pts.b.y - pts.tSize / 2 - 34,
+              opacity: 0, rotate: -120, scale: 1,
+            }}
+            animate={seg}
+            transition={seg.transition}
+          >
+            <GiWool size={pts.tSize} aria-hidden="true" />
+          </motion.span>
+        )}
+      </motion.h1>
+    </div>
+  )
+}
 
 const Header = ({ cartCount, favoritesCount, onCartClick, onFavoritesClick, cartIconRef, onSearchClick }) => {
   const navigate = useNavigate()
@@ -58,19 +230,7 @@ const Header = ({ cartCount, favoritesCount, onCartClick, onFavoritesClick, cart
       transition={{ duration: 0.6 }}
     >
       <div className="header-container">
-        <div className="header-logo" onClick={() => navigate('/')}>
-          <motion.h1
-            whileHover={{ scale: 1.03 }}
-            transition={{ duration: 0.2 }}
-          >
-            <motion.span
-              className="logo-yarn"
-              whileHover={{ rotate: 20 }}
-              transition={{ duration: 0.3 }}
-            >🧶</motion.span>
-            {' '}Nani <em>ki</em> Bunai
-          </motion.h1>
-        </div>
+        <BrandLogo onClick={() => navigate('/')} />
 
         {/* Desktop nav — mobile uses the MobileMenu drawer below */}
         <nav className="header-nav">

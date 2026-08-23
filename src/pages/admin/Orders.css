@@ -567,59 +567,97 @@
   font-weight: 500;
 }
 
-/* ── Audit timeline ── */
+/* ── Audit timeline — compact rail with one-line entries ── */
 .adm-orders__timeline {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  position: relative;
+}
+
+/* connecting rail through the dots */
+.adm-orders__timeline::before {
+  content: '';
+  position: absolute;
+  left: 3.5px;
+  top: 8px;
+  bottom: 8px;
+  width: 1px;
+  background: var(--border-subtle, #e5ddd4);
 }
 
 .adm-orders__timeline-item {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: 8px 1fr;
+  column-gap: 10px;
+  padding: 2px 0;
+  position: relative;
 }
 
 .adm-orders__timeline-dot {
-  width: 9px;
-  height: 9px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   margin-top: 5px;
-  flex-shrink: 0;
   background: var(--text-muted);
+  position: relative; /* sits on top of the rail */
 }
 
 .adm-orders__timeline-dot--admin { background: var(--terracotta); }
 .adm-orders__timeline-dot--customer { background: #5A3E85; }
 .adm-orders__timeline-dot--system { background: #9A8C82; }
 
-.adm-orders__timeline-body {
+/* one line: event text left, time right */
+.adm-orders__timeline-row {
   display: flex;
-  flex-direction: column;
-  gap: 1px;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
   min-width: 0;
 }
 
 .adm-orders__timeline-text {
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 500;
   color: var(--deep-brown);
-}
-
-.adm-orders__timeline-note {
-  font-size: 0.78rem;
-  font-style: italic;
-  color: var(--text-light);
-  overflow-wrap: break-word;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .adm-orders__timeline-meta {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   color: var(--text-muted);
-  text-transform: capitalize;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.adm-orders__timeline-note {
+  grid-column: 2;
+  font-size: 0.73rem;
+  font-style: italic;
+  color: var(--text-light);
+  overflow-wrap: break-word;
+  line-height: 1.4;
+  margin-top: 1px;
+}
+
+/* collapsed-history toggle */
+.adm-orders__timeline-more {
+  display: inline-block;
+  margin-bottom: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 0.72rem;
+  color: var(--terracotta-dark, #a96b49);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.adm-orders__timeline-more:hover {
+  color: var(--deep-brown);
 }
 
 .adm-orders__quick-cell {

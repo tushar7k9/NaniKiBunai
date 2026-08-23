@@ -26,9 +26,11 @@
 }
 
 .maintenance-curtain__logo {
+  display: inline-flex;
   font-size: 3.2rem;
   line-height: 1;
   margin-bottom: 14px;
+  color: var(--terracotta);
 }
 
 .maintenance-curtain__title {

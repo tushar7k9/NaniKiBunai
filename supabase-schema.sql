@@ -246,6 +246,7 @@ CREATE TABLE IF NOT EXISTS reviews (
   images TEXT[] DEFAULT '{}',
   is_verified_purchase BOOLEAN DEFAULT false,
   is_approved BOOLEAN DEFAULT false,
+  is_featured BOOLEAN NOT NULL DEFAULT false, -- hand-picked for the homepage
   helpful_count INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
@@ -1047,5 +1048,74 @@ BEGIN
     END IF;
   END IF;
   RETURN NULL;
+END;
+$$;
+
+
+-- ============================================================
+-- MIGRATION 2026-08-23f: homepage-featured reviews.
+-- Run this in the Supabase SQL Editor (safe to re-run).
+--
+-- Adds reviews.is_featured — reviews the admin hand-picks for the
+-- "Stories of Warmth" section on the home page. Featured reviews are
+-- shown first; the best recent approved reviews fill remaining slots.
+-- Only approved reviews are ever publicly readable (existing policy).
+-- ============================================================
+
+ALTER TABLE reviews
+  ADD COLUMN IF NOT EXISTS is_featured BOOLEAN NOT NULL DEFAULT false;
+
+
+-- ============================================================
+-- MIGRATION 2026-08-23g: self-maintaining featured testimonials.
+-- Run this in the Supabase SQL Editor (safe to re-run).
+--
+-- The homepage calls get_home_testimonials(). If fewer than 3 approved
+-- text reviews are featured, it PROMOTES the best remaining ones
+-- (marking is_featured = true) so the admin panel always shows exactly
+-- which reviews are on the homepage. Un-featuring one simply lets the
+-- next best review be promoted on the next visit.
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION get_home_testimonials()
+RETURNS TABLE (
+  id INTEGER,
+  user_name TEXT,
+  rating INTEGER,
+  review_text TEXT,
+  created_at TIMESTAMPTZ,
+  is_verified_purchase BOOLEAN,
+  product_name TEXT
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  -- Top the featured set up to 3 with the best approved text reviews.
+  -- (All columns table-qualified: the RETURNS TABLE names would otherwise
+  -- shadow them and raise 42702 "ambiguous column".)
+  UPDATE reviews SET is_featured = true
+  WHERE reviews.id IN (
+    SELECT r.id FROM reviews r
+    WHERE r.is_approved
+      AND NOT r.is_featured
+      AND coalesce(r.review_text, '') <> ''
+    ORDER BY r.rating DESC, r.is_verified_purchase DESC, r.created_at DESC
+    LIMIT GREATEST(
+      0,
+      3 - (SELECT count(*) FROM reviews rf
+           WHERE rf.is_approved AND rf.is_featured AND coalesce(rf.review_text, '') <> '')
+    )
+  );
+
+  RETURN QUERY
+  SELECT r.id, r.user_name, r.rating, r.review_text, r.created_at,
+         r.is_verified_purchase, p.name
+  FROM reviews r
+  JOIN products p ON p.id = r.product_id
+  WHERE r.is_approved AND r.is_featured AND coalesce(r.review_text, '') <> ''
+  ORDER BY r.rating DESC, r.is_verified_purchase DESC, r.created_at DESC
+  LIMIT 3;
 END;
 $$;

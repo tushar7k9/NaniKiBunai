@@ -1,8 +1,25 @@
-import React from 'react'
+import React, { useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { SketchYarnBall, SketchStar } from './SketchElements'
 import './Categories.css'
+
+/* On phones the row scrolls horizontally — give it a gentle one-time nudge
+   when it first appears so it's obvious there are more categories */
+const nudgeScroll = (el) => {
+  if (!el || el.scrollWidth <= el.clientWidth) return
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  const start = performance.now()
+  const DIST = 36
+  const DUR = 900
+  const tick = (now) => {
+    const p = Math.min(1, (now - start) / DUR)
+    // out and back: sin curve peaks at DIST mid-way
+    el.scrollLeft = Math.sin(p * Math.PI) * DIST
+    if (p < 1) requestAnimationFrame(tick)
+  }
+  requestAnimationFrame(tick)
+}
 
 const categories = [
   {
@@ -76,6 +93,8 @@ const itemVariants = {
 
 const Categories = () => {
   const navigate = useNavigate()
+  const gridRef = useRef(null)
+  const nudgedRef = useRef(false)
 
   return (
     <section className="categories">
@@ -99,11 +118,18 @@ const Categories = () => {
         </motion.div>
 
         <motion.div
+          ref={gridRef}
           className="categories-grid"
           variants={containerVariants}
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: '-60px' }}
+          onViewportEnter={() => {
+            if (nudgedRef.current) return
+            nudgedRef.current = true
+            // let the entrance stagger settle before hinting
+            setTimeout(() => nudgeScroll(gridRef.current), 700)
+          }}
         >
           {categories.map((category) => (
             <motion.div

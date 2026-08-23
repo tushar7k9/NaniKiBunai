@@ -15,6 +15,7 @@ import {
   FiMapPin,
   FiPhone,
 } from 'react-icons/fi'
+import { GiWool } from 'react-icons/gi'
 import { useAuth } from '../hooks/useAuth'
 import './MobileMenu.css'
 
@@ -99,7 +100,7 @@ const MobileMenu = ({ isOpen, onClose, favoritesCount = 0 }) => {
           >
             {/* Brand header */}
             <div className="mm-brand">
-              <span className="mm-brand__logo">🧶</span>
+              <span className="mm-brand__logo"><GiWool aria-hidden="true" /></span>
               <div className="mm-brand__text">
                 <span className="mm-brand__name">Nani <em>ki</em> Bunai</span>
                 <span className="mm-brand__tag">handcrafted with love</span>

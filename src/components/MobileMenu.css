@@ -32,12 +32,28 @@
   gap: 12px;
   padding: 20px 18px;
   background: var(--section-bg-alt, #F5EFE8);
-  border-bottom: 1px solid var(--border-subtle);
+  position: relative;
+  z-index: 1;
+}
+
+/* Menu content dissolves softly under the brand header — no divider line */
+.mm-brand::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 18px;
+  background: linear-gradient(to bottom, var(--section-bg-alt, #F5EFE8), transparent);
+  pointer-events: none;
 }
 
 .mm-brand__logo {
+  display: inline-flex;
+  align-items: center;
   font-size: 1.9rem;
   line-height: 1;
+  color: var(--terracotta);
 }
 
 .mm-brand__text {

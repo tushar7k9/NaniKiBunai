@@ -5,17 +5,35 @@
   left: 0;
   right: 0;
   z-index: 1000;
-  background: rgba(250, 249, 246, 0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  transition: all 0.35s var(--ease-out-expo);
+  transition: padding 0.35s var(--ease-out-expo);
   padding: 18px 0;
+}
+
+/* Progressive gradient blur: the tint and the backdrop blur both dissolve
+   below the bar instead of ending in a border or shadow line */
+.header::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 -36px 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    rgba(250, 249, 246, 0.97) 0%,
+    rgba(250, 249, 246, 0.94) 60%,
+    rgba(250, 249, 246, 0.6) 82%,
+    rgba(250, 249, 246, 0) 100%
+  );
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  /* blur stays strong deeper than the tint so the dissolve zone reads
+     as frosted rather than semi-clear */
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 72%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 72%, transparent 100%);
 }
 
 .header.scrolled {
   padding: 10px 0;
-  box-shadow: 0 1px 12px rgba(92, 64, 51, 0.08);
-  background: rgba(250, 249, 246, 0.97);
 }
 
 .header-container {
@@ -47,8 +65,53 @@
 }
 
 .logo-yarn {
+  display: inline-flex;
+  align-items: center;
+  font-size: 1.9rem;
+  color: var(--terracotta);
+  vertical-align: -0.22em;
+}
+
+/* ── Brand intro animation (dot hops across the i's into the icon) ── */
+.header-logo h1 {
+  position: relative;
+}
+
+.brand-i {
+  position: relative;
   display: inline-block;
-  font-size: 1.5rem;
+}
+
+.brand-i__dot {
+  position: absolute;
+  left: 50%;
+  top: 0.135em;
+  width: 0.165em;
+  height: 0.165em;
+  margin-left: -0.0825em;
+  border-radius: 50%;
+  background: currentColor;
+  transition: opacity 0.18s;
+}
+
+/* Playfair's italic lean puts the native dot at ~103% of the stem's
+   advance width (measured from the font) — not above the stem's centre */
+.header-logo h1 em .brand-i__dot {
+  left: 103%;
+  top: 0.13em;
+}
+
+/* the traveller is a miniature of the wool mark itself */
+.brand-traveler {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--terracotta);
+  pointer-events: none;
+  z-index: 2;
 }
 
 .header-nav {

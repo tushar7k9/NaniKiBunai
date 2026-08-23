@@ -150,6 +150,7 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
   const [confirmNote, setConfirmNote] = useState('')
   const [copiedField, setCopiedField] = useState(null)
   const [events, setEvents] = useState(null)
+  const [showAllEvents, setShowAllEvents] = useState(false)
   const trackingInputRef = useRef(null)
 
   // Audit timeline (loads once per expand)
@@ -504,7 +505,7 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
             </div>
           )}
 
-          {/* Audit timeline */}
+          {/* Audit timeline — compact one-line entries on a rail */}
           <div className="adm-orders__detail-section">
             <h4 className="adm-orders__detail-heading">Timeline</h4>
             {events === null ? (
@@ -514,24 +515,37 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
                 No history yet — events are recorded from the latest migration onwards.
               </p>
             ) : (
-              <ul className="adm-orders__timeline">
-                {events.map((e) => (
-                  <li key={e.id} className="adm-orders__timeline-item">
-                    <span className={`adm-orders__timeline-dot adm-orders__timeline-dot--${e.actor}`} />
-                    <div className="adm-orders__timeline-body">
-                      <span className="adm-orders__timeline-text">
-                        {e.event_type === 'created' && 'Order placed'}
-                        {e.event_type === 'status_change' && `${cap(e.from_status)} → ${cap(e.to_status)}`}
-                        {e.event_type === 'payment_change' && `Payment: ${cap(e.from_status)} → ${cap(e.to_status)}`}
-                      </span>
-                      {e.note && <span className="adm-orders__timeline-note">"{e.note}"</span>}
-                      <span className="adm-orders__timeline-meta">
-                        {e.actor} · {formatDateTime(e.created_at)}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <>
+                {events.length > 5 && !showAllEvents && (
+                  <button
+                    className="adm-orders__timeline-more"
+                    onClick={() => setShowAllEvents(true)}
+                  >
+                    Show earlier activity ({events.length - 5})
+                  </button>
+                )}
+                <ul className="adm-orders__timeline">
+                  {(showAllEvents ? events : events.slice(-5)).map((e) => (
+                    <li key={e.id} className="adm-orders__timeline-item">
+                      <span
+                        className={`adm-orders__timeline-dot adm-orders__timeline-dot--${e.actor}`}
+                        title={e.actor}
+                      />
+                      <div className="adm-orders__timeline-row">
+                        <span className="adm-orders__timeline-text">
+                          {e.event_type === 'created' && 'Order placed'}
+                          {e.event_type === 'status_change' && `${cap(e.from_status)} → ${cap(e.to_status)}`}
+                          {e.event_type === 'payment_change' && `Payment ${cap(e.from_status)} → ${cap(e.to_status)}`}
+                        </span>
+                        <span className="adm-orders__timeline-meta" title={e.actor}>
+                          {formatDateTime(e.created_at)}
+                        </span>
+                      </div>
+                      {e.note && <div className="adm-orders__timeline-note">"{e.note}"</div>}
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
           </div>
         </div>
