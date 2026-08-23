@@ -373,6 +373,8 @@
 .adm-badge--refunded { background: #F8D7DA; color: #721C24; }
 .adm-badge--paid { background: #D4EDDA; color: #155724; }
 .adm-badge--failed { background: #F8D7DA; color: #721C24; }
+.adm-badge--partially_refunded { background: #E9E4DF; color: #6B5D4F; }
+.adm-badge--not_charged { background: #EDEAE6; color: #857A70; }
 .adm-badge--new { background: var(--terracotta-light); color: var(--deep-brown); }
 .adm-badge--read { background: #CCE5FF; color: #004085; }
 .adm-badge--replied { background: #D4EDDA; color: #155724; }

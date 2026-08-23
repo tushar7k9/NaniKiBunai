@@ -81,7 +81,7 @@ export const getOrderDetails = async (orderId) => {
   return data
 }
 
-export const updateOrderStatus = async (orderId, status, { fromStatus, trackingNumber } = {}) => {
+export const updateOrderStatus = async (orderId, status, { fromStatus, trackingNumber, customerNote } = {}) => {
   const updates = { status, updated_at: new Date().toISOString() }
 
   // Set timestamps on forward transitions
@@ -91,7 +91,12 @@ export const updateOrderStatus = async (orderId, status, { fromStatus, trackingN
   // 'returned' keeps shipped_at/delivered_at/tracking — the order WAS delivered.
   if (status === 'cancelled') updates.cancelled_at = new Date().toISOString()
   if (status === 'returned') updates.returned_at = new Date().toISOString()
-  if (status === 'refunded') updates.refunded_at = new Date().toISOString()
+  if (status === 'refunded') {
+    updates.refunded_at = new Date().toISOString()
+    // money returned — keep payment in sync (the DB trigger enforces this
+    // regardless of client, and blocks refunds on never-paid orders)
+    updates.payment_status = 'refunded'
+  }
   if (trackingNumber !== undefined) updates.tracking_number = trackingNumber
 
   // Cleanup on backward transitions and cancellations
@@ -108,6 +113,18 @@ export const updateOrderStatus = async (orderId, status, { fromStatus, trackingN
     updates.delivered_at = null
   }
 
+  // Customer-facing note: set on backward moves (delay explanation),
+  // cleared automatically once the order moves forward again
+  const forwardArrival =
+    (status === 'shipped' && fromStatus === 'processing') ||
+    (status === 'delivered' && fromStatus === 'shipped') ||
+    status === 'completed'
+  if (customerNote !== undefined) {
+    updates.customer_note = (customerNote || '').trim().slice(0, 300) || null
+  } else if (forwardArrival) {
+    updates.customer_note = null
+  }
+
   const { data, error } = await supabase
     .from('orders')
     .update(updates)
@@ -117,6 +134,31 @@ export const updateOrderStatus = async (orderId, status, { fromStatus, trackingN
 
   if (error) throw error
   return data
+}
+
+/** Mark an order's payment collected/refunded (COD flow). */
+export const updatePaymentStatus = async (orderId, paymentStatus) => {
+  const { data, error } = await supabase
+    .from('orders')
+    .update({ payment_status: paymentStatus, updated_at: new Date().toISOString() })
+    .eq('id', orderId)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+/** Audit timeline for one order (admin RLS grants full access). */
+export const getOrderEvents = async (orderId) => {
+  const { data, error } = await supabase
+    .from('order_events')
+    .select('*')
+    .eq('order_id', orderId)
+    .order('created_at', { ascending: true })
+
+  if (error) throw error
+  return data || []
 }
 
 export const updateTrackingNumber = async (orderId, trackingNumber) => {

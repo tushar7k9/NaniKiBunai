@@ -160,22 +160,24 @@ const Checkout = () => {
         totalAmount: total,
         customerNotes: orderNotes || null,
         productInstructions,
-        paymentMethod: 'simulated',
+        paymentMethod: 'cod',
       }
 
+      // COD: the order starts as pending/payment-due for everyone (guest or
+      // signed in) — the admin confirms it and marks payment when collected
       const result = await orderService.createOrder(orderData)
-      await orderService.updatePaymentStatus(result.order.id, 'paid', 'simulated-payment-intent')
-      await orderService.updateOrderStatus(result.order.id, 'confirmed')
 
       clearCart()
       setIsProcessing(false)
 
       if (isAuthenticated && user) {
-        alert(`Order placed! Your order number is: ${result.order.order_number}`)
+        alert(
+          `Order placed! Your order number is: ${result.order.order_number}\n\nPay ₹${total.toFixed(0)} in cash when your order is delivered.`
+        )
         navigate('/orders')
       } else {
         alert(
-          `Order placed!\n\nOrder: ${result.order.order_number}\n\nLog in with ${shippingInfo.email} to track your order.`
+          `Order placed!\n\nOrder: ${result.order.order_number}\nPay ₹${total.toFixed(0)} in cash on delivery.\n\nLog in with ${shippingInfo.email} to track your order.`
         )
         navigate('/')
       }
@@ -385,6 +387,17 @@ const Checkout = () => {
                   <p className="co-review-hint">
                     Review your items in the summary panel, then place your order.
                   </p>
+
+                  {/* Payment method — COD */}
+                  <div className="co-payment-card">
+                    <span className="co-payment-card__label">Payment</span>
+                    <span className="co-payment-card__method">💵 Cash on Delivery</span>
+                    <span className="co-payment-card__note">
+                      Pay ₹{total.toFixed(0)} in cash when your handcrafted piece arrives.
+                      No advance payment needed.
+                    </span>
+                  </div>
+
                   <div className="co-secure-note">
                     <FiLock /> <span>Secure checkout</span>
                   </div>

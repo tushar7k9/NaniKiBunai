@@ -22,24 +22,61 @@ const statusConfig = {
   refunded:   { icon: FiXCircle,     label: 'Refunded',   color: '#c0392b' },
 }
 
-const statusMessages = {
-  pending:    "We've received your order and will confirm it shortly.",
-  confirmed:  "Your order is confirmed! We're preparing your handcrafted piece.",
-  processing: "Your piece is being crafted with care and attention.",
-  shipped:    "Your order is on its way! Arriving soon.",
-  delivered:  "Your handcrafted piece has arrived. We hope you love it!",
-  completed:  "Thank you for being part of our handcrafted journey.",
-  cancelled:  "This order was cancelled.",
-  returned:   "This order was returned. A refund will be processed shortly.",
-  refunded:   "A refund has been processed for this order.",
+/**
+ * Payment-aware status message — the money situation changes what the
+ * customer most needs to hear (COD: refunds only exist for paid orders).
+ */
+const getStatusMessage = (order) => {
+  const paid = order.payment_status === 'paid'
+  const amount = `₹${parseFloat(order.total_amount).toFixed(0)}`
+  switch (order.status) {
+    case 'pending':
+      return "We've received your order and will confirm it shortly."
+    case 'confirmed':
+      return "Your order is confirmed! We're preparing your handcrafted piece."
+    case 'processing':
+      return 'Your piece is being crafted with care and attention.'
+    case 'shipped':
+      return paid
+        ? 'Your order is on its way! Arriving soon.'
+        : `Your order is on its way! Please keep ${amount} ready — pay in cash on delivery.`
+    case 'delivered':
+      return paid
+        ? 'Your handcrafted piece has arrived. We hope you love it!'
+        : `Your handcrafted piece has arrived — please complete the ${amount} cash payment if you haven't already.`
+    case 'completed':
+      return 'Thank you for being part of our handcrafted journey.'
+    case 'cancelled':
+      return paid
+        ? `This order was cancelled — your refund of ${amount} is being processed (7–10 business days).`
+        : "This order was cancelled. You haven't been charged."
+    case 'returned':
+      return paid
+        ? `Return received — your refund of ${amount} is on its way (7–10 business days).`
+        : 'Return recorded. No payment was due.'
+    case 'refunded':
+      return `Your refund of ${amount} has been completed.`
+    default:
+      return ''
+  }
 }
 
 const paymentStatusConfig = {
   paid:                { label: 'Paid',               color: '#2d8659', bg: 'rgba(45, 134, 89, 0.1)' },
-  pending:             { label: 'Payment Pending',    color: '#b8860b', bg: 'rgba(184, 134, 11, 0.1)' },
+  pending:             { label: 'Pay on delivery',    color: '#b8860b', bg: 'rgba(184, 134, 11, 0.1)' },
+  not_charged:         { label: 'Not charged',        color: '#9A8C82', bg: 'rgba(154, 140, 130, 0.1)' },
   failed:              { label: 'Payment Failed',     color: '#c0392b', bg: 'rgba(192, 57, 43, 0.1)' },
   refunded:            { label: 'Refunded',           color: '#9A8C82', bg: 'rgba(154, 140, 130, 0.1)' },
   partially_refunded:  { label: 'Partially Refunded', color: '#9A8C82', bg: 'rgba(154, 140, 130, 0.1)' },
+}
+
+// A cancelled/returned order that was never paid owes nothing — showing
+// "Pay on delivery" there would be misleading
+const getPayStatus = (order) => {
+  if (order.payment_status === 'pending' && ['cancelled', 'returned'].includes(order.status)) {
+    return paymentStatusConfig.not_charged
+  }
+  return paymentStatusConfig[order.payment_status]
 }
 
 const ORDER_STEPS = [
@@ -69,7 +106,7 @@ const detectCarrier = (trackingNumber) => {
 }
 
 // ── Progress Stepper ──
-const OrderProgressStepper = ({ order }) => {
+const OrderProgressStepper = ({ order, events }) => {
   if (['cancelled', 'returned', 'refunded'].includes(order.status)) {
     const labels = {
       cancelled: 'Order Cancelled',
@@ -90,10 +127,19 @@ const OrderProgressStepper = ({ order }) => {
     ? 4
     : ORDER_STEPS.findIndex(s => s.key === order.status)
 
+  // Real dates from the audit trail (confirmed/processing have no columns);
+  // dedicated columns win for shipped/delivered, events fill the rest
+  const eventDate = (statusKey) =>
+    events?.find(
+      (e) => e.event_type === 'status_change' && e.to_status === statusKey
+    )?.created_at || null
+
   const getTimestamp = (stepKey) => {
     if (stepKey === 'pending') return order.created_at
-    if (stepKey === 'shipped') return order.shipped_at
-    if (stepKey === 'delivered') return order.delivered_at
+    if (stepKey === 'confirmed') return eventDate('confirmed')
+    if (stepKey === 'processing') return eventDate('processing')
+    if (stepKey === 'shipped') return order.shipped_at || eventDate('shipped')
+    if (stepKey === 'delivered') return order.delivered_at || eventDate('delivered')
     return null
   }
 
@@ -136,6 +182,9 @@ const Orders = () => {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const [cancelError, setCancelError] = useState(null)
   const [cancelLoading, setCancelLoading] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancelledJustNow, setCancelledJustNow] = useState(null) // orderId
+  const [orderEvents, setOrderEvents] = useState({}) // orderId -> events[]
 
   useEffect(() => {
     if (authLoading) return
@@ -166,16 +215,34 @@ const Orders = () => {
     try {
       setCancelError(null)
       setCancelLoading(true)
-      await orderService.cancelOrder(cancellingId)
+      const updated = await orderService.cancelOrder(
+        cancellingId,
+        cancelReason.trim() || null
+      )
+      // The RPC returns the authoritative row — sync it into state
       setOrders(prev => prev.map(o =>
-        o.id === cancellingId ? { ...o, status: 'cancelled' } : o
+        o.id === cancellingId ? { ...o, ...updated } : o
       ))
+      setCancelledJustNow(cancellingId)
       setShowCancelConfirm(false)
       setCancellingId(null)
+      setCancelReason('')
     } catch (err) {
       setCancelError(err.message || 'Failed to cancel order. Please try again.')
     } finally {
       setCancelLoading(false)
+    }
+  }
+
+  // Expand a card; lazily fetch its audit events (real dates for the stepper)
+  const toggleExpand = (order) => {
+    const next = expandedId === order.id ? null : order.id
+    setExpandedId(next)
+    if (next !== order.id) setCancelledJustNow(null)
+    if (next && !orderEvents[order.id]) {
+      orderService.getOrderEvents(order.id).then(events =>
+        setOrderEvents(prev => ({ ...prev, [order.id]: events }))
+      )
     }
   }
 
@@ -274,7 +341,7 @@ const Orders = () => {
               const isExpanded = expandedId === order.id
               const carrier = detectCarrier(order.tracking_number)
               const showTracking = order.tracking_number && ['shipped', 'delivered', 'completed'].includes(order.status)
-              const payStatus = paymentStatusConfig[order.payment_status]
+              const payStatus = getPayStatus(order)
 
               return (
                 <motion.div
@@ -287,7 +354,7 @@ const Orders = () => {
                   {/* Card Header — always visible */}
                   <button
                     className="ord-card__header"
-                    onClick={() => setExpandedId(isExpanded ? null : order.id)}
+                    onClick={() => toggleExpand(order)}
                   >
                     <div className="ord-card__left">
                       <div className="ord-card__thumbs">
@@ -307,6 +374,14 @@ const Orders = () => {
                       <div className="ord-card__meta">
                         <span className="ord-card__number">#{order.order_number}</span>
                         <span className="ord-card__date">{formatDate(order.created_at)}</span>
+                        {payStatus && (
+                          <span
+                            className="ord-card__pay"
+                            style={{ color: payStatus.color, background: payStatus.bg }}
+                          >
+                            {payStatus.label}
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -323,16 +398,28 @@ const Orders = () => {
                   <div className={`ord-details${isExpanded ? ' open' : ''}`}>
                     <div className="ord-details__inner">
 
+                      {/* Cancellation confirmation (just happened) */}
+                      {cancelledJustNow === order.id && (
+                        <div className="ord-cancel-success">
+                          <FiCheckCircle /> Your order has been cancelled.
+                        </div>
+                      )}
+
                       {/* 1. Progress Stepper */}
                       <div className="ord-details__section">
-                        <OrderProgressStepper order={order} />
+                        <OrderProgressStepper order={order} events={orderEvents[order.id]} />
                       </div>
 
                       {/* 2. Status Message */}
                       <div className="ord-details__section">
                         <p className="ord-status-message">
-                          {statusMessages[order.status] || ''}
+                          {getStatusMessage(order)}
                         </p>
+                        {order.customer_note && (
+                          <p className="ord-note-from-us">
+                            <strong>Update from us:</strong> {order.customer_note}
+                          </p>
+                        )}
                       </div>
 
                       {/* 3. Items */}
@@ -509,7 +596,19 @@ const Orders = () => {
               <h3 className="ord-confirm__title">Cancel this order?</h3>
               <p className="ord-confirm__text">
                 This action cannot be undone. Your order will be cancelled.
+                {orders.find(o => o.id === cancellingId)?.payment_status === 'paid'
+                  ? ' Your payment will be refunded within 7–10 business days.'
+                  : " You haven't been charged."}
               </p>
+              <textarea
+                className="ord-confirm__reason"
+                rows={2}
+                maxLength={300}
+                placeholder="Help us improve — why are you cancelling? (optional)"
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                disabled={cancelLoading}
+              />
               {cancelError && <p className="ord-confirm__error">{cancelError}</p>}
               <div className="ord-confirm__actions">
                 <button
@@ -521,7 +620,7 @@ const Orders = () => {
                 </button>
                 <button
                   className="ord-confirm__btn ord-confirm__btn--keep"
-                  onClick={() => { setShowCancelConfirm(false); setCancellingId(null); setCancelError(null) }}
+                  onClick={() => { setShowCancelConfirm(false); setCancellingId(null); setCancelError(null); setCancelReason('') }}
                   disabled={cancelLoading}
                 >
                   Keep Order

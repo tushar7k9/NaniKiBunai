@@ -122,6 +122,38 @@
   margin-bottom: 14px;
 }
 
+/* COD payment method card in the review step */
+.co-payment-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  background: var(--section-bg-alt, #F5EFE8);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  margin-bottom: 14px;
+}
+
+.co-payment-card__label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+}
+
+.co-payment-card__method {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--deep-brown);
+}
+
+.co-payment-card__note {
+  font-size: 0.8rem;
+  line-height: 1.55;
+  color: var(--text-light);
+}
+
 /* Consent line under the Place Order button */
 .co-consent {
   margin: 12px 0 0;
