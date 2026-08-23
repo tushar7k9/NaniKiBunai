@@ -243,10 +243,18 @@ export const orderService = {
         userEmail = user.email
       }
 
+      // Explicit columns: customers don't need admin_notes,
+      // payment_intent_id, or billing_address on their dashboard
+      const CUSTOMER_ORDER_COLUMNS =
+        'id, order_number, user_id, status, subtotal, shipping_cost, tax_amount, ' +
+        'discount_amount, total_amount, shipping_address, customer_email, customer_phone, ' +
+        'payment_status, payment_method, tracking_number, customer_notes, cancellation_reason, ' +
+        'shipped_at, delivered_at, cancelled_at, returned_at, refunded_at, created_at, updated_at'
+
       // Build query for orders linked to user
       let query = supabase
         .from('orders')
-        .select('*')
+        .select(CUSTOMER_ORDER_COLUMNS)
         .eq('user_id', targetUserId)
         .order('created_at', { ascending: false })
 
@@ -276,7 +284,7 @@ export const orderService = {
       if (options.includeGuestOrders !== false && userEmail) {
         const { data: guestOrders } = await supabase
           .from('orders')
-          .select('*')
+          .select(CUSTOMER_ORDER_COLUMNS)
           .eq('customer_email', userEmail)
           .is('user_id', null)
           .order('created_at', { ascending: false })
@@ -313,174 +321,58 @@ export const orderService = {
   },
 
   /**
-   * Update order status
+   * Cancel an order via the atomic cancel_my_order RPC.
+   * The database enforces ownership AND the pending/confirmed gate in a
+   * single statement (customers have no direct UPDATE rights on orders),
+   * which also eliminates the cancel-vs-ship race.
    * @param {string} orderId - Order UUID
-   * @param {string} status - New status (pending, confirmed, processing, shipped, delivered, completed, cancelled, returned, refunded)
-   * @returns {Promise<Object>} Success indicator
-   */
-  updateOrderStatus: async (orderId, status) => {
-    try {
-      const validStatuses = [
-        'pending',
-        'confirmed',
-        'processing',
-        'shipped',
-        'delivered',
-        'completed',
-        'cancelled',
-        'returned',
-        'refunded',
-      ]
-
-      if (!validStatuses.includes(status)) {
-        throw new Error(`Invalid status: ${status}`)
-      }
-
-      const updateData = {
-        status,
-        updated_at: new Date().toISOString(),
-      }
-
-      // Add timestamps for specific statuses
-      if (status === 'shipped') {
-        updateData.shipped_at = new Date().toISOString()
-      } else if (status === 'delivered') {
-        updateData.delivered_at = new Date().toISOString()
-      }
-
-      // Don't use .select() for guest users (they don't have SELECT permission after UPDATE)
-      const { error } = await supabase
-        .from('orders')
-        .update(updateData)
-        .eq('id', orderId)
-
-      if (error) {
-        console.error('Error updating order status:', error)
-        throw error
-      }
-
-      // Return success indicator instead of the updated order
-      return { success: true, orderId, status }
-    } catch (error) {
-      console.error('Error in updateOrderStatus:', error)
-      throw error
-    }
-  },
-
-  /**
-   * Update order payment status (simulated for now)
-   * @param {string} orderId - Order UUID
-   * @param {string} paymentStatus - Payment status (pending, paid, failed, refunded, partially_refunded)
-   * @param {string} paymentIntentId - Payment intent ID from payment processor (optional)
-   * @returns {Promise<Object>} Updated order (or null for guest orders)
-   */
-  updatePaymentStatus: async (orderId, paymentStatus, paymentIntentId = null) => {
-    try {
-      const validStatuses = ['pending', 'paid', 'failed', 'refunded', 'partially_refunded']
-
-      if (!validStatuses.includes(paymentStatus)) {
-        throw new Error(`Invalid payment status: ${paymentStatus}`)
-      }
-
-      const updateData = {
-        payment_status: paymentStatus,
-        updated_at: new Date().toISOString(),
-      }
-
-      if (paymentIntentId) {
-        updateData.payment_intent_id = paymentIntentId
-      }
-
-      // Don't use .select() for guest users (they don't have SELECT permission after UPDATE)
-      const { error } = await supabase
-        .from('orders')
-        .update(updateData)
-        .eq('id', orderId)
-
-      if (error) {
-        console.error('Error updating payment status:', error)
-        throw error
-      }
-
-      // Return success indicator instead of the updated order
-      return { success: true, orderId, paymentStatus }
-    } catch (error) {
-      console.error('Error in updatePaymentStatus:', error)
-      throw error
-    }
-  },
-
-  /**
-   * Add tracking number to order
-   * @param {string} orderId - Order UUID
-   * @param {string} trackingNumber - Tracking number
-   * @returns {Promise<Object>} Success indicator
-   */
-  addTrackingNumber: async (orderId, trackingNumber) => {
-    try {
-      const { error } = await supabase
-        .from('orders')
-        .update({
-          tracking_number: trackingNumber,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', orderId)
-
-      if (error) {
-        console.error('Error adding tracking number:', error)
-        throw error
-      }
-
-      return { success: true, orderId, trackingNumber }
-    } catch (error) {
-      console.error('Error in addTrackingNumber:', error)
-      throw error
-    }
-  },
-
-  /**
-   * Cancel an order (only if status is pending or confirmed)
-   * @param {string} orderId - Order UUID
-   * @param {string} reason - Cancellation reason (optional)
-   * @returns {Promise<Object>} Success indicator
+   * @param {string} reason - Optional cancellation reason (max 300 chars)
+   * @returns {Promise<Object>} The updated order row
    */
   cancelOrder: async (orderId, reason = null) => {
     try {
-      // First check current status (guests can't do this, only for authenticated users)
-      const { data: order } = await supabase
-        .from('orders')
-        .select('status')
-        .eq('id', orderId)
-        .single()
-
-      if (!order) {
-        throw new Error('Order not found')
-      }
-
-      if (!['pending', 'confirmed'].includes(order.status)) {
-        throw new Error('Order cannot be cancelled at this stage')
-      }
-
-      const updateData = {
-        status: 'cancelled',
-        admin_notes: reason || 'Order cancelled by customer',
-        updated_at: new Date().toISOString(),
-      }
-
-      const { error } = await supabase
-        .from('orders')
-        .update(updateData)
-        .eq('id', orderId)
+      const { data, error } = await supabase.rpc('cancel_my_order', {
+        p_order_id: orderId,
+        p_reason: reason,
+      })
 
       if (error) {
+        if (/ORDER_NOT_CANCELLABLE/.test(error.message)) {
+          throw new Error(
+            'This order can no longer be cancelled — it may already be in crafting. Please contact us and we\'ll help.'
+          )
+        }
         console.error('Error cancelling order:', error)
         throw error
       }
 
-      return { success: true, orderId, status: 'cancelled' }
+      // RPC returns SETOF orders — a single-row array
+      return Array.isArray(data) ? data[0] : data
     } catch (error) {
       console.error('Error in cancelOrder:', error)
       throw error
+    }
+  },
+
+  /**
+   * Fetch the audit timeline for an order (RLS limits access to the
+   * order's owner and the admin).
+   * @param {string} orderId - Order UUID
+   * @returns {Promise<Array>} Events, oldest first
+   */
+  getOrderEvents: async (orderId) => {
+    try {
+      const { data, error } = await supabase
+        .from('order_events')
+        .select('*')
+        .eq('order_id', orderId)
+        .order('created_at', { ascending: true })
+
+      if (error) throw error
+      return data || []
+    } catch (error) {
+      console.error('Error fetching order events:', error)
+      return []
     }
   },
 

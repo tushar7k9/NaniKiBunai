@@ -49,6 +49,8 @@ const CONFIRM_TRANSITIONS = {
   'shipped→processing': 'This will clear the tracking number and shipment date. Continue?',
   'delivered→shipped': 'This will clear the delivery date. Continue?',
   'delivered→returned': 'Mark this order as returned by the customer? It will be excluded from revenue. Continue?',
+  'cancelled→refunded': 'Mark as refunded? Confirm the money has been returned to the customer — this is final.',
+  'returned→refunded': 'Mark as refunded? Confirm the money has been returned to the customer — this is final.',
 }
 
 // Backward transitions render as ghost buttons in the detail actions
@@ -100,18 +102,36 @@ const formatDate = (d) =>
 const formatCurrency = (amount) =>
   `₹${Number(amount).toLocaleString('en-IN')}`
 
+const formatDateTime = (d) =>
+  new Date(d).toLocaleString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+
+const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '')
+
 // ── Expanded row detail ──────────────────────────────────────
 const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
   const [status, setStatus] = useState(order.status)
+  const [paymentStatus, setPaymentStatus] = useState(order.payment_status || 'pending')
   const [tracking, setTracking] = useState(order.tracking_number || '')
   const [savingStatus, setSavingStatus] = useState(false)
   const [savingTracking, setSavingTracking] = useState(false)
+  const [savingPayment, setSavingPayment] = useState(false)
   const [statusMsg, setStatusMsg] = useState('')
   const [trackingMsg, setTrackingMsg] = useState('')
   const [pendingShipment, setPendingShipment] = useState(false)
   const [confirmTransition, setConfirmTransition] = useState(null) // { to, message }
   const [copiedField, setCopiedField] = useState(null)
+  const [events, setEvents] = useState(null)
   const trackingInputRef = useRef(null)
+
+  // Audit timeline (loads once per expand)
+  useEffect(() => {
+    adminService.getOrderEvents(order.id).then(setEvents).catch(() => setEvents([]))
+  }, [order.id])
 
   const copyToClipboard = async (field, value) => {
     try {
@@ -121,9 +141,39 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
     } catch { /* clipboard unavailable — ignore */ }
   }
 
-  const isTerminal = TERMINAL_STATUSES.includes(status)
+  const isPaid = paymentStatus === 'paid'
+
+  // Payment-aware terminality: an unpaid cancelled/returned order was
+  // never charged — there is nothing to refund, so it's final
+  const isTerminal =
+    TERMINAL_STATUSES.includes(status) ||
+    (['cancelled', 'returned'].includes(status) && !isPaid)
+
   const showTracking = TRACKING_VISIBLE_STATUSES.includes(status)
-  const allowedNextStatuses = STATUS_TRANSITIONS[status] || []
+
+  // 'refunded' is only a legal next step when money actually changed hands
+  // (the DB trigger enforces this too)
+  const allowedNextStatuses = (STATUS_TRANSITIONS[status] || []).filter(
+    (s) => s !== 'refunded' || isPaid
+  )
+
+  const terminalLabel = ['cancelled', 'returned'].includes(status) && !isPaid
+    ? `${status.charAt(0).toUpperCase() + status.slice(1)} — not charged`
+    : `${status.charAt(0).toUpperCase() + status.slice(1)} — Final`
+
+  const handleMarkPaid = async () => {
+    setSavingPayment(true)
+    try {
+      const updated = await adminService.updatePaymentStatus(order.id, 'paid')
+      onStatusUpdate(order.id, updated)
+      setPaymentStatus('paid')
+      adminService.getOrderEvents(order.id).then(setEvents).catch(() => {})
+    } catch (err) {
+      console.error('Failed to mark payment:', err)
+    } finally {
+      setSavingPayment(false)
+    }
+  }
 
   const executeStatusChange = async (newStatus, opts = {}) => {
     setSavingStatus(true)
@@ -138,6 +188,8 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
       // Sync local tracking from response (may have been cleared)
       setTracking(updated.tracking_number || '')
       setStatus(newStatus)
+      if (updated.payment_status) setPaymentStatus(updated.payment_status)
+      adminService.getOrderEvents(order.id).then(setEvents).catch(() => {})
       setStatusMsg(opts.successMsg || 'Status updated')
     } catch {
       setStatusMsg('Failed to update status')
@@ -389,6 +441,16 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
             </div>
           )}
 
+          {/* Cancellation reason (from the customer's cancel dialog) */}
+          {order.cancellation_reason && (
+            <div className="adm-orders__detail-section">
+              <h4 className="adm-orders__detail-heading">Cancellation Reason</h4>
+              <p className="adm-orders__detail-text adm-orders__detail-text--note">
+                {order.cancellation_reason}
+              </p>
+            </div>
+          )}
+
           {/* Admin notes */}
           {order.admin_notes && (
             <div className="adm-orders__detail-section">
@@ -398,6 +460,37 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
               </p>
             </div>
           )}
+
+          {/* Audit timeline */}
+          <div className="adm-orders__detail-section">
+            <h4 className="adm-orders__detail-heading">Timeline</h4>
+            {events === null ? (
+              <p className="adm-orders__detail-text adm-orders__detail-text--muted">Loading…</p>
+            ) : events.length === 0 ? (
+              <p className="adm-orders__detail-text adm-orders__detail-text--muted">
+                No history yet — events are recorded from the latest migration onwards.
+              </p>
+            ) : (
+              <ul className="adm-orders__timeline">
+                {events.map((e) => (
+                  <li key={e.id} className="adm-orders__timeline-item">
+                    <span className={`adm-orders__timeline-dot adm-orders__timeline-dot--${e.actor}`} />
+                    <div className="adm-orders__timeline-body">
+                      <span className="adm-orders__timeline-text">
+                        {e.event_type === 'created' && 'Order placed'}
+                        {e.event_type === 'status_change' && `${cap(e.from_status)} → ${cap(e.to_status)}`}
+                        {e.event_type === 'payment_change' && `Payment: ${cap(e.from_status)} → ${cap(e.to_status)}`}
+                      </span>
+                      {e.note && <span className="adm-orders__timeline-note">"{e.note}"</span>}
+                      <span className="adm-orders__timeline-meta">
+                        {e.actor} · {formatDateTime(e.created_at)}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       </div>
 
@@ -409,7 +502,7 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
           <div className="adm-orders__action-row">
             {isTerminal ? (
               <span className="adm-orders__terminal-badge">
-                {status.charAt(0).toUpperCase() + status.slice(1)} — Final
+                {terminalLabel}
               </span>
             ) : (
               <div className="adm-orders__status-actions">
@@ -474,6 +567,33 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Payment (COD) */}
+        <div className="adm-orders__action-group">
+          <label className="adm-orders__action-label">Payment</label>
+          <div className="adm-orders__action-row">
+            <span className={`adm-badge adm-badge--${paymentStatus}`}>
+              {paymentStatus === 'pending' ? 'payment due' : paymentStatus}
+            </span>
+            {paymentStatus === 'pending' && !['cancelled', 'returned', 'refunded'].includes(status) && (
+              <button
+                className="adm-btn adm-btn--success adm-btn--sm"
+                onClick={handleMarkPaid}
+                disabled={savingPayment}
+              >
+                {savingPayment ? 'Saving…' : `Mark payment received (${formatCurrency(order.total_amount)})`}
+              </button>
+            )}
+            {paymentStatus === 'pending' && ['cancelled', 'returned'].includes(status) && (
+              <span className="adm-orders__pay-note">No payment was collected</span>
+            )}
+            {paymentStatus === 'paid' && ['cancelled', 'returned'].includes(status) && (
+              <span className="adm-orders__pay-note adm-orders__pay-note--due">
+                Refund of {formatCurrency(order.total_amount)} due — use "Mark refunded" once returned
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Tracking number — only visible for processing/shipped/delivered */}
@@ -619,8 +739,7 @@ const Orders = () => {
 
   // One-click forward step from the row. Shipping needs a tracking number,
   // so it expands the row to the full actions instead.
-  const handleQuickAction = async (order) => {
-    const quick = QUICK_ACTIONS[order.status]
+  const handleQuickAction = async (order, quick) => {
     if (!quick) return
     if (quick.expand) {
       setExpandedIds((prev) => new Set(prev).add(order.id))
@@ -759,7 +878,15 @@ const Orders = () => {
                     (sum, i) => sum + (i.quantity || 1),
                     0
                   )
-                  const quick = QUICK_ACTIONS[order.status]
+                  // A paid order that got cancelled/returned owes the
+                  // customer money — surface it and offer a one-click refund
+                  const refundDue =
+                    ['cancelled', 'returned'].includes(order.status) &&
+                    order.payment_status === 'paid'
+                  // money action — expands to the detail where it's confirmed
+                  const quick = refundDue
+                    ? { to: 'refunded', label: 'Process refund', expand: true }
+                    : QUICK_ACTIONS[order.status]
                   const isStale =
                     STALE_STATUSES.includes(order.status) &&
                     Date.now() - new Date(order.created_at).getTime() > STALE_AFTER_MS
@@ -774,6 +901,11 @@ const Orders = () => {
                           {isStale && (
                             <span className="adm-orders__stale-tag" title="Waiting for action for over 48 hours">
                               <FiClock /> needs action
+                            </span>
+                          )}
+                          {refundDue && (
+                            <span className="adm-orders__refund-tag" title="Customer paid — refund is owed">
+                              refund due
                             </span>
                           )}
                         </td>
@@ -812,7 +944,7 @@ const Orders = () => {
                               disabled={quickSavingId === order.id}
                               onClick={(e) => {
                                 e.stopPropagation()
-                                handleQuickAction(order)
+                                handleQuickAction(order, quick)
                               }}
                             >
                               {quickSavingId === order.id ? 'Saving…' : quick.label}

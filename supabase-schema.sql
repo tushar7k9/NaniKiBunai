@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS orders (
   tracking_number TEXT,
   customer_notes TEXT,
   admin_notes TEXT,
+  cancellation_reason TEXT CHECK (char_length(cancellation_reason) <= 300),
   shipped_at TIMESTAMPTZ,
   delivered_at TIMESTAMPTZ,
   cancelled_at TIMESTAMPTZ,
@@ -74,6 +75,143 @@ CREATE TABLE IF NOT EXISTS orders (
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- 4b. ORDER_EVENTS TABLE — audit trail of every order lifecycle change.
+-- Rows are written ONLY by the log_order_event trigger (no INSERT policy).
+CREATE TABLE IF NOT EXISTS order_events (
+  id BIGSERIAL PRIMARY KEY,
+  order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  event_type TEXT NOT NULL CHECK (event_type IN ('created', 'status_change', 'payment_change')),
+  from_status TEXT,
+  to_status TEXT,
+  actor TEXT NOT NULL CHECK (actor IN ('customer', 'admin', 'system')),
+  note TEXT CHECK (char_length(note) <= 500),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_order_events_order_id ON order_events(order_id);
+
+-- ── Order lifecycle triggers ─────────────────────────────────
+
+-- Audit: record creation, status changes, and payment changes with actor
+CREATE OR REPLACE FUNCTION log_order_event()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_actor TEXT;
+BEGIN
+  IF (auth.jwt() ->> 'email') = 'nanikiibunai@gmail.com' THEN
+    v_actor := 'admin';
+  ELSIF TG_OP = 'INSERT' THEN
+    v_actor := 'customer'; -- orders are created by the buyer (incl. guests)
+  ELSIF auth.uid() IS NOT NULL AND auth.uid() = NEW.user_id THEN
+    v_actor := 'customer';
+  ELSE
+    v_actor := 'system';
+  END IF;
+
+  IF TG_OP = 'INSERT' THEN
+    INSERT INTO order_events (order_id, event_type, to_status, actor)
+    VALUES (NEW.id, 'created', NEW.status, v_actor);
+  ELSE
+    IF NEW.status IS DISTINCT FROM OLD.status THEN
+      INSERT INTO order_events (order_id, event_type, from_status, to_status, actor, note)
+      VALUES (
+        NEW.id, 'status_change', OLD.status, NEW.status, v_actor,
+        CASE WHEN NEW.status = 'cancelled' THEN NEW.cancellation_reason END
+      );
+    END IF;
+    IF NEW.payment_status IS DISTINCT FROM OLD.payment_status THEN
+      INSERT INTO order_events (order_id, event_type, from_status, to_status, actor)
+      VALUES (NEW.id, 'payment_change', OLD.payment_status, NEW.payment_status, v_actor);
+    END IF;
+  END IF;
+  RETURN NULL;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS orders_log_event ON orders;
+CREATE TRIGGER orders_log_event
+  AFTER INSERT OR UPDATE ON orders
+  FOR EACH ROW EXECUTE FUNCTION log_order_event();
+
+-- State machine guard: the database is the source of truth for which
+-- transitions are legal, no matter which client attempts them.
+-- Also enforces: refunds only for paid orders, and syncs payment_status
+-- when an order becomes refunded.
+CREATE OR REPLACE FUNCTION enforce_order_transition()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+BEGIN
+  -- maintenance escape hatch: SQL editor (postgres) and service role
+  IF current_user IN ('postgres', 'supabase_admin') OR auth.role() = 'service_role' THEN
+    IF NEW.status = 'refunded' AND NEW.status IS DISTINCT FROM OLD.status THEN
+      NEW.payment_status := 'refunded';
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  IF NEW.status IS DISTINCT FROM OLD.status THEN
+    IF NOT (
+      (OLD.status = 'pending'    AND NEW.status IN ('confirmed', 'cancelled')) OR
+      (OLD.status = 'confirmed'  AND NEW.status IN ('processing', 'cancelled')) OR
+      (OLD.status = 'processing' AND NEW.status IN ('shipped', 'cancelled')) OR
+      (OLD.status = 'shipped'    AND NEW.status IN ('delivered', 'processing')) OR
+      (OLD.status = 'delivered'  AND NEW.status IN ('completed', 'returned', 'shipped')) OR
+      (OLD.status = 'cancelled'  AND NEW.status = 'refunded') OR
+      (OLD.status = 'returned'   AND NEW.status = 'refunded')
+    ) THEN
+      RAISE EXCEPTION 'INVALID_ORDER_TRANSITION: % -> %', OLD.status, NEW.status;
+    END IF;
+
+    IF NEW.status = 'refunded' THEN
+      IF OLD.payment_status <> 'paid' THEN
+        RAISE EXCEPTION 'REFUND_REQUIRES_PAYMENT';
+      END IF;
+      NEW.payment_status := 'refunded';
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS orders_enforce_transition ON orders;
+CREATE TRIGGER orders_enforce_transition
+  BEFORE UPDATE ON orders
+  FOR EACH ROW EXECUTE FUNCTION enforce_order_transition();
+
+-- Customer cancellation: the ONLY way customers mutate their orders.
+-- Atomic status gate in the WHERE clause kills both the JS-only guard
+-- and the cancel-vs-ship race.
+CREATE OR REPLACE FUNCTION cancel_my_order(p_order_id UUID, p_reason TEXT DEFAULT NULL)
+RETURNS SETOF orders
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN QUERY
+  UPDATE orders
+  SET status = 'cancelled',
+      cancelled_at = now(),
+      cancellation_reason = NULLIF(left(trim(coalesce(p_reason, '')), 300), ''),
+      updated_at = now()
+  WHERE id = p_order_id
+    AND user_id = auth.uid()
+    AND status IN ('pending', 'confirmed')
+  RETURNING *;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'ORDER_NOT_CANCELLABLE';
+  END IF;
+END;
+$$;
 
 -- 5. ORDER_ITEMS TABLE
 CREATE TABLE IF NOT EXISTS order_items (
@@ -185,6 +323,23 @@ ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
 ALTER TABLE store_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE order_events ENABLE ROW LEVEL SECURITY;
+
+-- ORDER_EVENTS: readable by the order's owner (incl. their pre-signup guest
+-- orders by verified email) and the admin; written only by triggers
+CREATE POLICY "Order events viewable by owner and admin"
+  ON order_events FOR SELECT
+  USING (
+    (auth.jwt() ->> 'email') = 'nanikiibunai@gmail.com'
+    OR EXISTS (
+      SELECT 1 FROM orders o
+      WHERE o.id = order_events.order_id
+      AND (
+        o.user_id = auth.uid()
+        OR (o.user_id IS NULL AND lower(o.customer_email) = lower(auth.jwt() ->> 'email'))
+      )
+    )
+  );
 
 -- STORE_SETTINGS: public read (store modes are public info), admin-only
 -- write, no INSERT/DELETE policies (seed row is created by the owner)
@@ -247,9 +402,10 @@ CREATE POLICY "Orders allowed when store is open"
     OR (auth.jwt() ->> 'email') = 'nanikiibunai@gmail.com'
   );
 
-CREATE POLICY "Users can update their own orders"
-  ON orders FOR UPDATE
-  USING (auth.uid() = user_id);
+-- NOTE: customers have NO direct UPDATE policy on orders. Their only
+-- mutation path is the cancel_my_order() RPC, which enforces ownership
+-- and the pending/confirmed gate atomically. (A broad UPDATE policy
+-- previously let any customer set arbitrary status/payment values.)
 
 -- Guest orders are visible only to a signed-in user whose verified email
 -- matches (NOT to anonymous visitors — that would expose all guest orders)
@@ -660,3 +816,170 @@ DROP TRIGGER IF EXISTS products_bump_catalog_version ON products;
 CREATE TRIGGER products_bump_catalog_version
   AFTER INSERT OR UPDATE OR DELETE ON products
   FOR EACH STATEMENT EXECUTE FUNCTION bump_catalog_version();
+
+-- ============================================
+-- MIGRATION 2026-08-23d: payment-aware order lifecycle.
+-- COD payment model (no more simulated 'paid'), order_events audit
+-- trail, database-enforced status transitions (refunds only for paid
+-- orders, payment auto-synced on refund), customer mutations locked
+-- down to an atomic cancel RPC, cancellation reasons stored properly.
+-- The base definitions above already include this for fresh installs —
+-- run ONLY this section in the SQL Editor to upgrade an existing
+-- database. Idempotent: safe to re-run.
+-- ============================================
+
+-- 1. Cancellation reason gets its own column (was hijacking admin_notes)
+ALTER TABLE orders
+  ADD COLUMN IF NOT EXISTS cancellation_reason TEXT CHECK (char_length(cancellation_reason) <= 300);
+
+-- 2. Audit trail
+CREATE TABLE IF NOT EXISTS order_events (
+  id BIGSERIAL PRIMARY KEY,
+  order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  event_type TEXT NOT NULL CHECK (event_type IN ('created', 'status_change', 'payment_change')),
+  from_status TEXT,
+  to_status TEXT,
+  actor TEXT NOT NULL CHECK (actor IN ('customer', 'admin', 'system')),
+  note TEXT CHECK (char_length(note) <= 500),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_order_events_order_id ON order_events(order_id);
+
+ALTER TABLE order_events ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Order events viewable by owner and admin" ON order_events;
+CREATE POLICY "Order events viewable by owner and admin"
+  ON order_events FOR SELECT
+  USING (
+    (auth.jwt() ->> 'email') = 'nanikiibunai@gmail.com'
+    OR EXISTS (
+      SELECT 1 FROM orders o
+      WHERE o.id = order_events.order_id
+      AND (
+        o.user_id = auth.uid()
+        OR (o.user_id IS NULL AND lower(o.customer_email) = lower(auth.jwt() ->> 'email'))
+      )
+    )
+  );
+
+CREATE OR REPLACE FUNCTION log_order_event()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_actor TEXT;
+BEGIN
+  IF (auth.jwt() ->> 'email') = 'nanikiibunai@gmail.com' THEN
+    v_actor := 'admin';
+  ELSIF TG_OP = 'INSERT' THEN
+    v_actor := 'customer';
+  ELSIF auth.uid() IS NOT NULL AND auth.uid() = NEW.user_id THEN
+    v_actor := 'customer';
+  ELSE
+    v_actor := 'system';
+  END IF;
+
+  IF TG_OP = 'INSERT' THEN
+    INSERT INTO order_events (order_id, event_type, to_status, actor)
+    VALUES (NEW.id, 'created', NEW.status, v_actor);
+  ELSE
+    IF NEW.status IS DISTINCT FROM OLD.status THEN
+      INSERT INTO order_events (order_id, event_type, from_status, to_status, actor, note)
+      VALUES (
+        NEW.id, 'status_change', OLD.status, NEW.status, v_actor,
+        CASE WHEN NEW.status = 'cancelled' THEN NEW.cancellation_reason END
+      );
+    END IF;
+    IF NEW.payment_status IS DISTINCT FROM OLD.payment_status THEN
+      INSERT INTO order_events (order_id, event_type, from_status, to_status, actor)
+      VALUES (NEW.id, 'payment_change', OLD.payment_status, NEW.payment_status, v_actor);
+    END IF;
+  END IF;
+  RETURN NULL;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS orders_log_event ON orders;
+CREATE TRIGGER orders_log_event
+  AFTER INSERT OR UPDATE ON orders
+  FOR EACH ROW EXECUTE FUNCTION log_order_event();
+
+-- 3. Database-enforced state machine
+CREATE OR REPLACE FUNCTION enforce_order_transition()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+BEGIN
+  IF current_user IN ('postgres', 'supabase_admin') OR auth.role() = 'service_role' THEN
+    IF NEW.status = 'refunded' AND NEW.status IS DISTINCT FROM OLD.status THEN
+      NEW.payment_status := 'refunded';
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  IF NEW.status IS DISTINCT FROM OLD.status THEN
+    IF NOT (
+      (OLD.status = 'pending'    AND NEW.status IN ('confirmed', 'cancelled')) OR
+      (OLD.status = 'confirmed'  AND NEW.status IN ('processing', 'cancelled')) OR
+      (OLD.status = 'processing' AND NEW.status IN ('shipped', 'cancelled')) OR
+      (OLD.status = 'shipped'    AND NEW.status IN ('delivered', 'processing')) OR
+      (OLD.status = 'delivered'  AND NEW.status IN ('completed', 'returned', 'shipped')) OR
+      (OLD.status = 'cancelled'  AND NEW.status = 'refunded') OR
+      (OLD.status = 'returned'   AND NEW.status = 'refunded')
+    ) THEN
+      RAISE EXCEPTION 'INVALID_ORDER_TRANSITION: % -> %', OLD.status, NEW.status;
+    END IF;
+
+    IF NEW.status = 'refunded' THEN
+      IF OLD.payment_status <> 'paid' THEN
+        RAISE EXCEPTION 'REFUND_REQUIRES_PAYMENT';
+      END IF;
+      NEW.payment_status := 'refunded';
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS orders_enforce_transition ON orders;
+CREATE TRIGGER orders_enforce_transition
+  BEFORE UPDATE ON orders
+  FOR EACH ROW EXECUTE FUNCTION enforce_order_transition();
+
+-- 4. Customers mutate orders ONLY through the atomic cancel RPC
+DROP POLICY IF EXISTS "Users can update their own orders" ON orders;
+
+CREATE OR REPLACE FUNCTION cancel_my_order(p_order_id UUID, p_reason TEXT DEFAULT NULL)
+RETURNS SETOF orders
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN QUERY
+  UPDATE orders
+  SET status = 'cancelled',
+      cancelled_at = now(),
+      cancellation_reason = NULLIF(left(trim(coalesce(p_reason, '')), 300), ''),
+      updated_at = now()
+  WHERE id = p_order_id
+    AND user_id = auth.uid()
+    AND status IN ('pending', 'confirmed')
+  RETURNING *;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'ORDER_NOT_CANCELLABLE';
+  END IF;
+END;
+$$;
+
+-- 5. Honest data: undo the simulated 'paid' flags from the old checkout
+UPDATE orders
+SET payment_status = 'pending', payment_method = 'cod'
+WHERE payment_intent_id = 'simulated-payment-intent'
+  AND status <> 'refunded';

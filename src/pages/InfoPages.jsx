@@ -87,9 +87,12 @@ export const TermsPage = () => (
       <p>
         All prices are in Indian Rupees (₹) and include applicable product taxes
         unless shown separately at checkout. Shipping charges and taxes, where
-        applicable, are displayed before you place the order. Payment is collected
-        through our payment partners; we never store your card or banking
-        credentials on our systems.
+        applicable, are displayed before you place the order.
+      </p>
+      <p>
+        We currently accept <strong>Cash on Delivery (COD)</strong> — you pay the
+        order total in cash when your piece is delivered. No advance payment is
+        collected, and we never store card or banking credentials on our systems.
       </p>
     </section>
 
@@ -309,6 +312,15 @@ export const ShippingReturnsPage = () => (
     </section>
 
     <section>
+      <h2>Payment — Cash on Delivery</h2>
+      <p>
+        You pay in cash when your order arrives — no advance payment. Please keep
+        the order total ready for the delivery partner. If a COD order is refused
+        at the door, it's recorded as returned with nothing charged.
+      </p>
+    </section>
+
+    <section>
       <h2>Shipping</h2>
       <ul>
         <li>We ship across India through trusted courier partners.</li>
@@ -406,6 +418,11 @@ export const HelpPage = () => (
           Yes! Choose <em>Custom</em> on any product and enter your measurements.
           Custom pieces are made exclusively for you and are non-returnable except
           for defects.
+        </dd>
+        <dt>How do I pay?</dt>
+        <dd>
+          Cash on Delivery — pay the order total in cash when your piece arrives.
+          No advance payment needed.
         </dd>
         <dt>Do I need an account to order?</dt>
         <dd>
