@@ -71,7 +71,7 @@ const ACTION_LABELS = {
 const QUICK_ACTIONS = {
   pending: { to: 'confirmed', label: 'Confirm' },
   confirmed: { to: 'processing', label: 'Process' },
-  processing: { to: 'shipped', label: 'Ship…', expand: true },
+  processing: { to: 'shipped', label: 'Add tracking & ship', expand: true },
   shipped: { to: 'delivered', label: 'Delivered' },
   delivered: { to: 'completed', label: 'Complete' },
 }
@@ -800,10 +800,15 @@ const Orders = () => {
                             {order.payment_status || 'pending'}
                           </span>
                         </td>
-                        <td className="adm-orders__quick-cell" data-cell="actions">
+                        {/* data-cell="actions" only when a button exists — an empty
+                            actions cell would render a stray divider in card mode */}
+                        <td
+                          className="adm-orders__quick-cell"
+                          {...(quick && !isExpanded ? { 'data-cell': 'actions' } : {})}
+                        >
                           {quick && !isExpanded && (
                             <button
-                              className="adm-btn adm-btn--secondary adm-btn--sm adm-orders__quick-btn"
+                              className="adm-orders__quick-btn"
                               disabled={quickSavingId === order.id}
                               onClick={(e) => {
                                 e.stopPropagation()
