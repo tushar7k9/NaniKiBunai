@@ -225,7 +225,13 @@ const UserDetail = () => {
                         <td data-label="Items">{(order.order_items || []).length}</td>
                         <td data-label="Total">{formatCurrency(order.total_amount)}</td>
                         <td data-label="Status"><span className={`adm-badge adm-badge--${order.status}`}>{order.status}</span></td>
-                        <td data-label="Payment"><span className={`adm-badge adm-badge--${order.payment_status || 'pending'}`}>{order.payment_status || 'pending'}</span></td>
+                        <td data-label="Payment">{(() => {
+                          const pay = order.payment_status || 'pending'
+                          if (pay === 'pending' && ['cancelled', 'returned'].includes(order.status)) {
+                            return <span className="adm-badge adm-badge--not_charged">not charged</span>
+                          }
+                          return <span className={`adm-badge adm-badge--${pay}`}>{pay === 'pending' ? 'pay on delivery' : pay.replace('_', ' ')}</span>
+                        })()}</td>
                       </tr>
                       {expanded && (
                         <tr className="adm-user-detail__order-items" data-row="detail">

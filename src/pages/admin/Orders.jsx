@@ -9,6 +9,7 @@ import {
   FiCopy,
   FiCheck,
   FiClock,
+  FiCornerUpLeft,
 } from 'react-icons/fi'
 import * as adminService from '../../services/adminService'
 import './Orders.css'
@@ -53,8 +54,30 @@ const CONFIRM_TRANSITIONS = {
   'returned→refunded': 'Mark as refunded? Confirm the money has been returned to the customer — this is final.',
 }
 
-// Backward transitions render as ghost buttons in the detail actions
+// Backward transitions render as ghost buttons in the detail actions,
+// with explicit "go back" labels so they don't read as forward steps
 const BACKWARD_TRANSITIONS = ['shipped→processing', 'delivered→shipped']
+const BACKWARD_LABELS = {
+  'shipped→processing': 'Back to processing',
+  'delivered→shipped': 'Back to shipped',
+}
+
+// Default customer-facing message offered when moving an order backward.
+// The admin can edit or clear it before confirming.
+const DEFAULT_DELAY_NOTE =
+  'Sorry — your order is taking a little longer than expected. ' +
+  'We are working on it and will keep you updated.'
+
+// Payment display is derived, not raw: a cancelled/returned order that was
+// never paid owes nothing, and a COD "pending" means due on delivery
+const paymentBadge = (status, paymentStatus) => {
+  const pay = paymentStatus || 'pending'
+  if (pay === 'pending' && ['cancelled', 'returned'].includes(status)) {
+    return { cls: 'not_charged', label: 'not charged' }
+  }
+  if (pay === 'pending') return { cls: 'pending', label: 'pay on delivery' }
+  return { cls: pay, label: pay.replace('_', ' ') }
+}
 
 // Human labels for status action buttons
 const ACTION_LABELS = {
@@ -123,7 +146,8 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
   const [statusMsg, setStatusMsg] = useState('')
   const [trackingMsg, setTrackingMsg] = useState('')
   const [pendingShipment, setPendingShipment] = useState(false)
-  const [confirmTransition, setConfirmTransition] = useState(null) // { to, message }
+  const [confirmTransition, setConfirmTransition] = useState(null) // { to, message, backward }
+  const [confirmNote, setConfirmNote] = useState('')
   const [copiedField, setCopiedField] = useState(null)
   const [events, setEvents] = useState(null)
   const trackingInputRef = useRef(null)
@@ -157,9 +181,14 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
     (s) => s !== 'refunded' || isPaid
   )
 
+  // Who cancelled — from the audit trail (null for pre-audit orders)
+  const cancelledBy = status === 'cancelled'
+    ? (events || []).find((e) => e.event_type === 'status_change' && e.to_status === 'cancelled')?.actor || null
+    : null
+
   const terminalLabel = ['cancelled', 'returned'].includes(status) && !isPaid
-    ? `${status.charAt(0).toUpperCase() + status.slice(1)} — not charged`
-    : `${status.charAt(0).toUpperCase() + status.slice(1)} — Final`
+    ? `${cap(status)}${cancelledBy ? ` by ${cancelledBy}` : ''} — not charged`
+    : `${cap(status)} — Final`
 
   const handleMarkPaid = async () => {
     setSavingPayment(true)
@@ -182,6 +211,7 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
       const updated = await adminService.updateOrderStatus(order.id, newStatus, {
         fromStatus: status,
         trackingNumber: opts.trackingNumber,
+        customerNote: opts.customerNote,
       })
       onStatusUpdate(order.id, updated)
       if (opts.trackingNumber !== undefined) onTrackingUpdate(order.id, updated)
@@ -202,12 +232,11 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
   const handleStatusChange = async (newStatus) => {
     if (newStatus === status) return
 
-    // Shipped requires tracking number
+    // Shipped requires tracking number — status stays as-is until confirmed
     if (newStatus === 'shipped' && !tracking.trim()) {
-      setStatus(newStatus)
       setPendingShipment(true)
       setConfirmTransition(null)
-      setStatusMsg('Enter tracking number to confirm shipment')
+      setStatusMsg('Enter the tracking number below to confirm shipment')
       setTimeout(() => trackingInputRef.current?.focus(), 100)
       return
     }
@@ -216,7 +245,10 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
     const confirmKey = `${status}→${newStatus}`
     const confirmMsg = CONFIRM_TRANSITIONS[confirmKey]
     if (confirmMsg) {
-      setConfirmTransition({ to: newStatus, message: confirmMsg })
+      const backward = BACKWARD_TRANSITIONS.includes(confirmKey)
+      setConfirmTransition({ to: newStatus, message: confirmMsg, backward })
+      // Backward moves offer a customer-facing explanation, pre-filled
+      setConfirmNote(backward ? DEFAULT_DELAY_NOTE : '')
       return
     }
 
@@ -232,9 +264,9 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
 
   const handleConfirmTransition = async () => {
     if (!confirmTransition) return
-    const newStatus = confirmTransition.to
+    const { to: newStatus, backward } = confirmTransition
     setConfirmTransition(null)
-    await executeStatusChange(newStatus)
+    await executeStatusChange(newStatus, backward ? { customerNote: confirmNote } : {})
   }
 
   const handleCancelTransition = () => {
@@ -256,7 +288,6 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
   }
 
   const handleCancelShipment = () => {
-    setStatus(order.status)
     setPendingShipment(false)
     setStatusMsg('')
   }
@@ -420,7 +451,9 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
               </div>
               {order.payment_method && (
                 <div className="adm-orders__breakdown-meta">
-                  Paid via {order.payment_method}
+                  {order.payment_method === 'cod'
+                    ? isPaid ? 'Cash on Delivery — collected' : 'Cash on Delivery'
+                    : `Paid via ${order.payment_method}`}
                 </div>
               )}
               {order.tracking_number && (
@@ -447,6 +480,16 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
               <h4 className="adm-orders__detail-heading">Cancellation Reason</h4>
               <p className="adm-orders__detail-text adm-orders__detail-text--note">
                 {order.cancellation_reason}
+              </p>
+            </div>
+          )}
+
+          {/* Customer-facing note (set on backward moves; auto-clears on ship/deliver) */}
+          {order.customer_note && (
+            <div className="adm-orders__detail-section">
+              <h4 className="adm-orders__detail-heading">Note Shown to Customer</h4>
+              <p className="adm-orders__detail-text adm-orders__detail-text--note">
+                {order.customer_note}
               </p>
             </div>
           )}
@@ -504,7 +547,7 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
               <span className="adm-orders__terminal-badge">
                 {terminalLabel}
               </span>
-            ) : (
+            ) : pendingShipment ? null : (
               <div className="adm-orders__status-actions">
                 {allowedNextStatuses.map((s) => {
                   const isBackward = BACKWARD_TRANSITIONS.includes(`${status}→${s}`)
@@ -512,7 +555,7 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
                     s === 'cancelled'
                       ? 'adm-btn--danger'
                       : isBackward
-                        ? 'adm-btn--ghost'
+                        ? 'adm-btn--ghost adm-orders__backward-btn'
                         : s === 'returned' || s === 'refunded'
                           ? 'adm-btn--secondary'
                           : 'adm-btn--primary'
@@ -521,13 +564,18 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
                       key={s}
                       className={`adm-btn ${variant} adm-btn--sm`}
                       onClick={() => handleStatusChange(s)}
-                      disabled={savingStatus || pendingShipment || !!confirmTransition}
+                      disabled={savingStatus || !!confirmTransition}
                     >
-                      {ACTION_LABELS[s] || s}
+                      {isBackward && <FiCornerUpLeft className="adm-orders__backward-icon" />}
+                      {isBackward ? BACKWARD_LABELS[`${status}→${s}`] : (ACTION_LABELS[s] || s)}
                     </button>
                   )
                 })}
               </div>
+            )}
+            {/* Paid cancels aren't terminal (refund pending) — still say who cancelled */}
+            {!isTerminal && cancelledBy && (
+              <span className="adm-orders__cancelled-by">Cancelled by {cancelledBy}</span>
             )}
             {savingStatus && <span className="adm-orders__saving">Saving…</span>}
             {statusMsg && (
@@ -549,6 +597,21 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
           {confirmTransition && (
             <div className="adm-orders__confirm-banner">
               <p className="adm-orders__confirm-text">{confirmTransition.message}</p>
+              {confirmTransition.backward && (
+                <div className="adm-orders__confirm-note">
+                  <label className="adm-orders__confirm-note-label">
+                    Message shown to the customer (optional)
+                  </label>
+                  <textarea
+                    className="adm-input adm-orders__confirm-note-input"
+                    value={confirmNote}
+                    onChange={(e) => setConfirmNote(e.target.value)}
+                    maxLength={300}
+                    rows={2}
+                    placeholder="Explain the delay to the customer…"
+                  />
+                </div>
+              )}
               <div className="adm-orders__confirm-actions">
                 <button
                   className="adm-btn adm-btn--primary adm-btn--sm"
@@ -573,9 +636,10 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
         <div className="adm-orders__action-group">
           <label className="adm-orders__action-label">Payment</label>
           <div className="adm-orders__action-row">
-            <span className={`adm-badge adm-badge--${paymentStatus}`}>
-              {paymentStatus === 'pending' ? 'payment due' : paymentStatus}
-            </span>
+            {(() => {
+              const pb = paymentBadge(status, paymentStatus)
+              return <span className={`adm-badge adm-badge--${pb.cls}`}>{pb.label}</span>
+            })()}
             {paymentStatus === 'pending' && !['cancelled', 'returned', 'refunded'].includes(status) && (
               <button
                 className="adm-btn adm-btn--success adm-btn--sm"
@@ -584,9 +648,6 @@ const OrderDetail = ({ order, onStatusUpdate, onTrackingUpdate }) => {
               >
                 {savingPayment ? 'Saving…' : `Mark payment received (${formatCurrency(order.total_amount)})`}
               </button>
-            )}
-            {paymentStatus === 'pending' && ['cancelled', 'returned'].includes(status) && (
-              <span className="adm-orders__pay-note">No payment was collected</span>
             )}
             {paymentStatus === 'paid' && ['cancelled', 'returned'].includes(status) && (
               <span className="adm-orders__pay-note adm-orders__pay-note--due">
@@ -926,11 +987,10 @@ const Orders = () => {
                           </span>
                         </td>
                         <td data-label="Payment">
-                          <span
-                            className={`adm-badge adm-badge--${order.payment_status || 'pending'}`}
-                          >
-                            {order.payment_status || 'pending'}
-                          </span>
+                          {(() => {
+                            const pb = paymentBadge(order.status, order.payment_status)
+                            return <span className={`adm-badge adm-badge--${pb.cls}`}>{pb.label}</span>
+                          })()}
                         </td>
                         {/* data-cell="actions" only when a button exists — an empty
                             actions cell would render a stray divider in card mode */}

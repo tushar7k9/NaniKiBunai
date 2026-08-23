@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS orders (
   customer_notes TEXT,
   admin_notes TEXT,
   cancellation_reason TEXT CHECK (char_length(cancellation_reason) <= 300),
+  customer_note TEXT CHECK (char_length(customer_note) <= 300),
   shipped_at TIMESTAMPTZ,
   delivered_at TIMESTAMPTZ,
   cancelled_at TIMESTAMPTZ,
@@ -121,7 +122,12 @@ BEGIN
       INSERT INTO order_events (order_id, event_type, from_status, to_status, actor, note)
       VALUES (
         NEW.id, 'status_change', OLD.status, NEW.status, v_actor,
-        CASE WHEN NEW.status = 'cancelled' THEN NEW.cancellation_reason END
+        CASE
+          WHEN NEW.status = 'cancelled' THEN NEW.cancellation_reason
+          -- customer-facing note set alongside the change (e.g. delay
+          -- explanation on a backward move) is kept in the timeline too
+          WHEN NEW.customer_note IS DISTINCT FROM OLD.customer_note THEN NEW.customer_note
+        END
       );
     END IF;
     IF NEW.payment_status IS DISTINCT FROM OLD.payment_status THEN
@@ -983,3 +989,63 @@ UPDATE orders
 SET payment_status = 'pending', payment_method = 'cod'
 WHERE payment_intent_id = 'simulated-payment-intent'
   AND status <> 'refunded';
+
+
+-- ============================================================
+-- MIGRATION 2026-08-23e: customer-facing order note.
+-- Run this in the Supabase SQL Editor (safe to re-run).
+--
+-- Adds orders.customer_note — a short message from the admin that the
+-- customer sees on their order (e.g. a delay explanation when an order
+-- is moved back from shipped to processing). The audit trigger records
+-- the note in the timeline whenever it changes with a status change.
+-- ============================================================
+
+-- 1. Column (admin-written; customers read it via their own-orders SELECT)
+ALTER TABLE orders
+  ADD COLUMN IF NOT EXISTS customer_note TEXT CHECK (char_length(customer_note) <= 300);
+
+-- 2. Audit trigger: keep customer_note changes in the timeline
+CREATE OR REPLACE FUNCTION log_order_event()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_actor TEXT;
+BEGIN
+  IF (auth.jwt() ->> 'email') = 'nanikiibunai@gmail.com' THEN
+    v_actor := 'admin';
+  ELSIF TG_OP = 'INSERT' THEN
+    v_actor := 'customer'; -- orders are created by the buyer (incl. guests)
+  ELSIF auth.uid() IS NOT NULL AND auth.uid() = NEW.user_id THEN
+    v_actor := 'customer';
+  ELSE
+    v_actor := 'system';
+  END IF;
+
+  IF TG_OP = 'INSERT' THEN
+    INSERT INTO order_events (order_id, event_type, to_status, actor)
+    VALUES (NEW.id, 'created', NEW.status, v_actor);
+  ELSE
+    IF NEW.status IS DISTINCT FROM OLD.status THEN
+      INSERT INTO order_events (order_id, event_type, from_status, to_status, actor, note)
+      VALUES (
+        NEW.id, 'status_change', OLD.status, NEW.status, v_actor,
+        CASE
+          WHEN NEW.status = 'cancelled' THEN NEW.cancellation_reason
+          -- customer-facing note set alongside the change (e.g. delay
+          -- explanation on a backward move) is kept in the timeline too
+          WHEN NEW.customer_note IS DISTINCT FROM OLD.customer_note THEN NEW.customer_note
+        END
+      );
+    END IF;
+    IF NEW.payment_status IS DISTINCT FROM OLD.payment_status THEN
+      INSERT INTO order_events (order_id, event_type, from_status, to_status, actor)
+      VALUES (NEW.id, 'payment_change', OLD.payment_status, NEW.payment_status, v_actor);
+    END IF;
+  END IF;
+  RETURN NULL;
+END;
+$$;

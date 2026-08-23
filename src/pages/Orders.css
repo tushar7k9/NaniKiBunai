@@ -570,6 +570,24 @@
   line-height: 1.5;
 }
 
+/* Admin's customer-facing note (e.g. delay explanation) */
+.ord-note-from-us {
+  margin: 12px auto 0;
+  max-width: 480px;
+  padding: 10px 14px;
+  background: rgba(184, 134, 11, 0.08);
+  border: 1px solid rgba(184, 134, 11, 0.25);
+  border-radius: 8px;
+  font-size: 0.88rem;
+  color: #7a5c00;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.ord-note-from-us strong {
+  font-weight: 600;
+}
+
 /* ── Enhanced Tracking ── */
 .ord-tracking {
   display: flex;

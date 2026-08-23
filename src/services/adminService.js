@@ -81,7 +81,7 @@ export const getOrderDetails = async (orderId) => {
   return data
 }
 
-export const updateOrderStatus = async (orderId, status, { fromStatus, trackingNumber } = {}) => {
+export const updateOrderStatus = async (orderId, status, { fromStatus, trackingNumber, customerNote } = {}) => {
   const updates = { status, updated_at: new Date().toISOString() }
 
   // Set timestamps on forward transitions
@@ -111,6 +111,18 @@ export const updateOrderStatus = async (orderId, status, { fromStatus, trackingN
     updates.tracking_number = null
     updates.shipped_at = null
     updates.delivered_at = null
+  }
+
+  // Customer-facing note: set on backward moves (delay explanation),
+  // cleared automatically once the order moves forward again
+  const forwardArrival =
+    (status === 'shipped' && fromStatus === 'processing') ||
+    (status === 'delivered' && fromStatus === 'shipped') ||
+    status === 'completed'
+  if (customerNote !== undefined) {
+    updates.customer_note = (customerNote || '').trim().slice(0, 300) || null
+  } else if (forwardArrival) {
+    updates.customer_note = null
   }
 
   const { data, error } = await supabase

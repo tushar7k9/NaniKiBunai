@@ -248,7 +248,7 @@ export const orderService = {
       const CUSTOMER_ORDER_COLUMNS =
         'id, order_number, user_id, status, subtotal, shipping_cost, tax_amount, ' +
         'discount_amount, total_amount, shipping_address, customer_email, customer_phone, ' +
-        'payment_status, payment_method, tracking_number, customer_notes, cancellation_reason, ' +
+        'payment_status, payment_method, tracking_number, customer_notes, cancellation_reason, customer_note, ' +
         'shipped_at, delivered_at, cancelled_at, returned_at, refunded_at, created_at, updated_at'
 
       // Build query for orders linked to user

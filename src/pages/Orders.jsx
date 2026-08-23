@@ -64,9 +64,19 @@ const getStatusMessage = (order) => {
 const paymentStatusConfig = {
   paid:                { label: 'Paid',               color: '#2d8659', bg: 'rgba(45, 134, 89, 0.1)' },
   pending:             { label: 'Pay on delivery',    color: '#b8860b', bg: 'rgba(184, 134, 11, 0.1)' },
+  not_charged:         { label: 'Not charged',        color: '#9A8C82', bg: 'rgba(154, 140, 130, 0.1)' },
   failed:              { label: 'Payment Failed',     color: '#c0392b', bg: 'rgba(192, 57, 43, 0.1)' },
   refunded:            { label: 'Refunded',           color: '#9A8C82', bg: 'rgba(154, 140, 130, 0.1)' },
   partially_refunded:  { label: 'Partially Refunded', color: '#9A8C82', bg: 'rgba(154, 140, 130, 0.1)' },
+}
+
+// A cancelled/returned order that was never paid owes nothing — showing
+// "Pay on delivery" there would be misleading
+const getPayStatus = (order) => {
+  if (order.payment_status === 'pending' && ['cancelled', 'returned'].includes(order.status)) {
+    return paymentStatusConfig.not_charged
+  }
+  return paymentStatusConfig[order.payment_status]
 }
 
 const ORDER_STEPS = [
@@ -331,7 +341,7 @@ const Orders = () => {
               const isExpanded = expandedId === order.id
               const carrier = detectCarrier(order.tracking_number)
               const showTracking = order.tracking_number && ['shipped', 'delivered', 'completed'].includes(order.status)
-              const payStatus = paymentStatusConfig[order.payment_status]
+              const payStatus = getPayStatus(order)
 
               return (
                 <motion.div
@@ -405,6 +415,11 @@ const Orders = () => {
                         <p className="ord-status-message">
                           {getStatusMessage(order)}
                         </p>
+                        {order.customer_note && (
+                          <p className="ord-note-from-us">
+                            <strong>Update from us:</strong> {order.customer_note}
+                          </p>
+                        )}
                       </div>
 
                       {/* 3. Items */}
