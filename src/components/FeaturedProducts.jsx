@@ -25,7 +25,9 @@ const SkeletonCard = () => (
 const useIsTouchDevice = () => {
   const [isTouch, setIsTouch] = useState(false)
   useEffect(() => {
-    const mq = window.matchMedia('(hover: none), (pointer: coarse)')
+    // Touch device OR mobile-sized viewport: hover never (reliably) happens
+    // in either, so the add-to-bag button must be always visible
+    const mq = window.matchMedia('(hover: none), (pointer: coarse), (max-width: 768px)')
     setIsTouch(mq.matches)
     const handler = (e) => setIsTouch(e.matches)
     mq.addEventListener('change', handler)

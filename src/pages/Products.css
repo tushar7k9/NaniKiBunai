@@ -795,14 +795,10 @@
     aspect-ratio: 4 / 5;
   }
 
-  .p-card__add-bag {
-    /* Always visible on mobile since no hover */
-    transform: none;
-    opacity: 1;
-    position: relative;
-    background: var(--deep-brown);
-    border-radius: 0;
-  }
+  /* Note: add-to-bag visibility on mobile is handled in JS (isTouch /
+     narrow-viewport check animates it in). Do NOT force position/transform
+     here — position:relative used to push the button below the image inside
+     the overflow-hidden wrap, clipping it invisible on phones. */
 
   .story-moment__text {
     font-size: 0.95rem;
