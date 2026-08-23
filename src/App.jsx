@@ -39,19 +39,30 @@ import Profile from './pages/Profile'
 import Checkout from './pages/Checkout'
 import Orders from './pages/Orders'
 
-// Admin
+// Admin — all lazy-loaded: shoppers never download the admin area
+// (pages, admin CSS, recharts). Loaded on demand when the admin logs in.
 import AdminRoute from './components/AdminRoute'
-import AdminLayout from './pages/admin/AdminLayout'
-import AdminDashboard from './pages/admin/Dashboard'
-import AdminOrders from './pages/admin/Orders'
-import AdminProducts from './pages/admin/Products'
-import AdminReviews from './pages/admin/Reviews'
-import AdminMessages from './pages/admin/Messages'
-import AdminUsers from './pages/admin/Users'
-import AdminUserDetail from './pages/admin/UserDetail'
-
-// Lazy-loaded: keeps recharts (~100KB) out of the storefront bundle
+const AdminLayout = React.lazy(() => import('./pages/admin/AdminLayout'))
+const AdminDashboard = React.lazy(() => import('./pages/admin/Dashboard'))
+const AdminOrders = React.lazy(() => import('./pages/admin/Orders'))
+const AdminProducts = React.lazy(() => import('./pages/admin/Products'))
+const AdminReviews = React.lazy(() => import('./pages/admin/Reviews'))
+const AdminMessages = React.lazy(() => import('./pages/admin/Messages'))
+const AdminUsers = React.lazy(() => import('./pages/admin/Users'))
+const AdminUserDetail = React.lazy(() => import('./pages/admin/UserDetail'))
 const AdminAnalytics = React.lazy(() => import('./pages/admin/Analytics'))
+
+// Inline styles: the admin CSS itself is lazy, so the fallback can't rely on it
+const AdminFallback = () => (
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+    <div style={{
+      width: 28, height: 28, borderRadius: '50%',
+      border: '3px solid rgba(196, 137, 106, 0.25)', borderTopColor: '#C4896A',
+      animation: 'spin 0.6s linear infinite',
+    }} />
+    <style>{'@keyframes spin { to { transform: rotate(360deg) } }'}</style>
+  </div>
+)
 
 import './App.css'
 
@@ -105,16 +116,18 @@ function AppContent() {
       <ScrollToTop />
       <Routes>
         {/* Admin routes — separate layout, no Header/Footer */}
-        <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
-          <Route index element={<AdminDashboard />} />
-          <Route
-            path="analytics"
-            element={
-              <React.Suspense fallback={<div className="adm-loading"><div className="adm-spinner" /></div>}>
-                <AdminAnalytics />
+        <Route
+          path="/admin"
+          element={
+            <AdminRoute>
+              <React.Suspense fallback={<AdminFallback />}>
+                <AdminLayout />
               </React.Suspense>
-            }
-          />
+            </AdminRoute>
+          }
+        >
+          <Route index element={<AdminDashboard />} />
+          <Route path="analytics" element={<AdminAnalytics />} />
           <Route path="orders" element={<AdminOrders />} />
           <Route path="products" element={<AdminProducts />} />
           <Route path="users" element={<AdminUsers />} />
