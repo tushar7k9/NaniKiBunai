@@ -9,6 +9,36 @@ import { supabase } from '../lib/supabase'
 
 export const reviewService = {
   /**
+   * Home page "Stories of Warmth": up to 3 approved text reviews
+   * (admin-featured first, then best recent, verified before unverified)
+   * plus the honest overall rating stats across all approved reviews.
+   * Fails silent — the section simply doesn't render without data.
+   * @returns {Promise<{cards: Array, average: number, count: number}>}
+   */
+  getHomeTestimonials: async () => {
+    try {
+      const [cardsRes, ratingsRes] = await Promise.all([
+        // Self-maintaining featured set: the RPC promotes the best approved
+        // text reviews to featured when fewer than 3 are, so the admin panel
+        // always reflects exactly what's on the homepage
+        supabase.rpc('get_home_testimonials'),
+        supabase.from('reviews').select('rating').eq('is_approved', true),
+      ])
+      if (cardsRes.error) throw cardsRes.error
+      if (ratingsRes.error) throw ratingsRes.error
+      const ratings = ratingsRes.data || []
+      const count = ratings.length
+      const average = count
+        ? ratings.reduce((sum, r) => sum + r.rating, 0) / count
+        : 0
+      return { cards: cardsRes.data || [], average, count }
+    } catch (error) {
+      console.error('Error fetching home testimonials:', error)
+      return { cards: [], average: 0, count: 0 }
+    }
+  },
+
+  /**
    * Get all approved reviews for a product
    * @param {number} productId - Product ID
    * @param {Object} options - Query options

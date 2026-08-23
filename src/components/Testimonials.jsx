@@ -1,42 +1,40 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
+import { FiCheckCircle } from 'react-icons/fi'
 import { SketchStar, SketchSparkle, SketchUnderline } from './SketchElements'
+import { reviewService } from '../services/reviewService'
 import './Testimonials.css'
 
-const testimonials = [
-  {
-    id: 1,
-    name: 'Priya Sharma',
-    location: 'Mumbai',
-    avatar: '👩',
-    rating: 5,
-    text: 'The sweater I ordered for my mother was absolutely beautiful. The craftsmanship is incredible — every stitch is perfect. She cried when she opened it!',
-    product: 'Hand-knit Cashmere Sweater',
-    date: 'March 2025',
-  },
-  {
-    id: 2,
-    name: 'Rahul Verma',
-    location: 'Delhi',
-    avatar: '👨',
-    rating: 5,
-    text: 'I was skeptical about buying handmade online but Nani ki Bunai exceeded all expectations. The quality is just like something my grandmother would make.',
-    product: 'Merino Wool Scarf',
-    date: 'February 2025',
-  },
-  {
-    id: 3,
-    name: 'Ananya Patel',
-    location: 'Ahmedabad',
-    avatar: '👩‍🦱',
-    rating: 5,
-    text: 'Ordered a blanket for my newborn and it\'s the softest thing I\'ve ever touched. The attention to detail is remarkable. True love in every stitch!',
-    product: 'Baby Alpaca Blanket',
-    date: 'April 2025',
-  },
-]
+const MIN_REVIEWS = 3
 
+const formatMonthYear = (d) =>
+  new Date(d).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
+
+const initials = (name) =>
+  (name || '')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase() || '☺'
+
+/* Real approved customer reviews (admin-featured first). The section only
+   renders once there are at least MIN_REVIEWS approved text reviews —
+   nothing fake, nothing sparse. */
 const Testimonials = () => {
+  const [data, setData] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    reviewService.getHomeTestimonials().then((res) => {
+      if (!cancelled) setData(res)
+    })
+    return () => { cancelled = true }
+  }, [])
+
+  if (!data || data.cards.length < MIN_REVIEWS) return null
+
   return (
     <section className="testimonials">
       <div className="testimonials-bg-blob" aria-hidden="true" />
@@ -63,7 +61,7 @@ const Testimonials = () => {
         </motion.div>
 
         <div className="testimonials-grid">
-          {testimonials.map((t, index) => (
+          {data.cards.map((t, index) => (
             <motion.div
               key={t.id}
               className="testimonial-card"
@@ -81,17 +79,28 @@ const Testimonials = () => {
                 ))}
               </div>
 
-              <p className="testimonial-text">{t.text}</p>
+              <p className="testimonial-text">{t.review_text}</p>
 
-              <div className="testimonial-product">
-                <span className="product-tag">{t.product}</span>
-              </div>
+              {t.product_name && (
+                <div className="testimonial-product">
+                  <span className="product-tag">{t.product_name}</span>
+                </div>
+              )}
 
               <div className="testimonial-author">
-                <div className="author-avatar">{t.avatar}</div>
+                <div className="author-avatar author-avatar--initials">
+                  {initials(t.user_name)}
+                </div>
                 <div className="author-info">
-                  <span className="author-name">{t.name}</span>
-                  <span className="author-meta">{t.location} · {t.date}</span>
+                  <span className="author-name">{t.user_name || 'A happy customer'}</span>
+                  <span className="author-meta">
+                    {formatMonthYear(t.created_at)}
+                    {t.is_verified_purchase && (
+                      <span className="author-verified">
+                        <FiCheckCircle /> Verified purchase
+                      </span>
+                    )}
+                  </span>
                 </div>
               </div>
             </motion.div>
@@ -106,10 +115,13 @@ const Testimonials = () => {
           transition={{ duration: 0.6, delay: 0.3 }}
         >
           <div className="trust-rating-summary">
-            <span className="big-rating">4.9</span>
+            <span className="big-rating">{data.average.toFixed(1)}</span>
             <div className="rating-details">
-              <div className="big-stars">★★★★★</div>
-              <span>Based on 1,000+ reviews</span>
+              <div className="big-stars">
+                {'★'.repeat(Math.round(data.average))}
+                {'☆'.repeat(5 - Math.round(data.average))}
+              </div>
+              <span>Based on {data.count} review{data.count !== 1 ? 's' : ''}</span>
             </div>
           </div>
         </motion.div>

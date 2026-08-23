@@ -258,6 +258,19 @@ export const rejectReview = async (id) => {
   if (error) throw error
 }
 
+/** Toggle whether a review is featured in the homepage testimonials. */
+export const setReviewFeatured = async (id, isFeatured) => {
+  const { data, error } = await supabase
+    .from('reviews')
+    .update({ is_featured: isFeatured, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
 export const bulkApproveReviews = async (ids) => {
   const { data, error } = await supabase
     .from('reviews')

@@ -86,6 +86,18 @@ const Reviews = () => {
     }
   }
 
+  const handleToggleFeatured = async (review) => {
+    setActionLoading(`feature-${review.id}`)
+    try {
+      await adminService.setReviewFeatured(review.id, !review.is_featured)
+      await loadReviews(filter)
+    } catch (err) {
+      console.error('Failed to toggle featured:', err)
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
   const handleBulkApprove = async () => {
     const pendingIds = reviews.filter(r => !r.is_approved).map(r => r.id)
     if (pendingIds.length === 0) return
@@ -236,6 +248,20 @@ const Reviews = () => {
                     >
                       <FiCheck />
                       {isApproving ? 'Approving…' : 'Approve'}
+                    </button>
+                  )}
+                  {/* Only reviews with text can appear as homepage cards */}
+                  {!isPending && review.review_text && (
+                    <button
+                      className={`adm-btn adm-btn--sm ${review.is_featured ? 'adm-btn--gold' : 'adm-btn--ghost'}`}
+                      onClick={() => handleToggleFeatured(review)}
+                      disabled={actionLoading === `feature-${review.id}`}
+                      title={review.is_featured ? 'Remove from homepage' : 'Feature in the homepage testimonials'}
+                    >
+                      <FiStar />
+                      {actionLoading === `feature-${review.id}`
+                        ? 'Saving…'
+                        : review.is_featured ? 'Featured on homepage' : 'Feature on homepage'}
                     </button>
                   )}
                   <button
