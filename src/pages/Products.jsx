@@ -33,19 +33,20 @@ const storyMoments = [
   "From our hands to your home, with love in every loop",
 ]
 
-/* ─── Category Reveal Transition ─── */
-const CategoryReveal = ({ categoryName, onComplete }) => {
+/* ─── Category Reveal Transition ───
+   Fixed full-viewport curtain, independent of the grid swap underneath.
+   It mounts the instant a filter is tapped (no waiting on the grid's exit)
+   and is always in view no matter how far the user has scrolled — the two
+   things that made the old in-flow version flaky. All inner steps finish
+   by ~650ms, comfortably inside the 700ms window before it exits. */
+const CategoryReveal = ({ categoryName }) => {
   return (
     <motion.div
       className="category-reveal"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.2 }}
-      onAnimationComplete={(def) => {
-        // Only trigger on the exit animation completing
-        if (def === 'exit') onComplete?.()
-      }}
+      transition={{ duration: 0.25 }}
     >
       {/* Background wipe */}
       <motion.div
@@ -60,7 +61,7 @@ const CategoryReveal = ({ categoryName, onComplete }) => {
         className="category-reveal__name"
         initial={{ opacity: 0, y: 20, letterSpacing: '0.15em' }}
         animate={{ opacity: 1, y: 0, letterSpacing: '0.25em' }}
-        transition={{ delay: 0.15, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+        transition={{ delay: 0.1, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
       >
         {categoryName}
       </motion.h2>
@@ -70,7 +71,7 @@ const CategoryReveal = ({ categoryName, onComplete }) => {
         className="category-reveal__stitch"
         initial={{ scaleX: 0 }}
         animate={{ scaleX: 1 }}
-        transition={{ delay: 0.3, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+        transition={{ delay: 0.25, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
       />
 
       {/* Subtitle accent */}
@@ -78,7 +79,7 @@ const CategoryReveal = ({ categoryName, onComplete }) => {
         className="category-reveal__accent"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.45, duration: 0.3 }}
+        transition={{ delay: 0.4, duration: 0.25 }}
       >
         curated for you
       </motion.span>
@@ -325,14 +326,23 @@ const Products = () => {
     setRevealCategory(catName)
     setTransitionState('revealing')
 
-    // After reveal plays, apply the actual filter change
+    // After the reveal has played, apply the actual filter change
     clearTimeout(revealTimerRef.current)
     revealTimerRef.current = setTimeout(() => {
       setSelectedCategory(catId)
+
+      // While the curtain still covers the screen, jump back to the top of
+      // the grid so the new category starts from its beginning
+      if (filterBarRef.current) {
+        const barTop = filterBarRef.current.getBoundingClientRect().top + window.scrollY
+        const target = Math.max(0, barTop - 80)
+        if (window.scrollY > target) window.scrollTo({ top: target, behavior: 'auto' })
+      }
+
       setTransitionState('entering')
       // Reset to idle after cards have cascaded
       setTimeout(() => setTransitionState('idle'), 600)
-    }, 750)
+    }, 700)
   }, [selectedCategory])
 
   // Mark first render done on mount
@@ -553,20 +563,23 @@ const Products = () => {
       {/* ── Product Grid ── */}
       <div className="products-grid-wrap">
 
-        {/* Single AnimatePresence so transitions are serialized:
-            grid exits → reveal enters → reveal exits → new grid enters */}
-        <AnimatePresence mode="wait">
-          {transitionState === 'revealing' ? (
+        {/* Full-viewport curtain — independent of the grid swap below, so
+            it shows instantly and never gets cut short or scrolled out */}
+        <AnimatePresence>
+          {transitionState === 'revealing' && (
             <CategoryReveal key="reveal" categoryName={revealCategory} />
-          ) : (
-            <motion.div
-              className="products-grid"
-              key={gridKey}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-            >
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence mode="wait">
+          <motion.div
+            className="products-grid"
+            key={gridKey}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
               {filteredAndSortedProducts.map((product, index) => (
                 <React.Fragment key={product.id}>
                   <ProductCard
@@ -590,8 +603,7 @@ const Products = () => {
                   )}
                 </React.Fragment>
               ))}
-            </motion.div>
-          )}
+          </motion.div>
         </AnimatePresence>
 
         {/* Empty state */}
