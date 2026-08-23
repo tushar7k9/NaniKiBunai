@@ -324,23 +324,24 @@
    Responsive
    ═══════════════════════════════════════════ */
 
+/* Mobile keeps the desktop look: floating rounded card over the blurred
+   backdrop (previously a full-screen takeover). dvh + lower cap leave
+   room for the on-screen keyboard. */
 @media (max-width: 640px) {
   .search-overlay {
-    padding-top: 0;
+    padding: 7vh 14px 0;
   }
 
   .search-panel {
-    max-width: 100%;
-    max-height: 100vh;
-    border-radius: 0;
-    height: 100%;
+    max-height: 70dvh;
   }
 
+  /* Keyboard hints are meaningless on touch */
   .search-footer {
     display: none;
   }
 
   .search-input-wrap {
-    padding: 16px;
+    padding: 14px 16px;
   }
 }
